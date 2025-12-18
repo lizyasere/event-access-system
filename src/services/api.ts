@@ -74,7 +74,7 @@ export const apiService = {
     // Production: Call Google Apps Script
     const response = await fetch(API_CONFIG.APPS_SCRIPT_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
         action: "register",
         data,
@@ -141,7 +141,7 @@ export const apiService = {
     // Production: Call Google Apps Script
     const response = await fetch(API_CONFIG.APPS_SCRIPT_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
         action: "checkIn",
         ...request,

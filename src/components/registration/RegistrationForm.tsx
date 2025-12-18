@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Users, Check, Loader2 } from "lucide-react";
+import { toast } from "react-toastify";
 import type { RegistrationFormData, RegistrationFormInput } from "../../types";
 import { registrationSchema } from "../../types";
 import { apiService } from "../../services/api";
@@ -95,9 +96,10 @@ export const RegistrationForm: React.FC = () => {
       const mainGuestName = `${data.mainGuest.title} ${data.mainGuest.firstName} ${data.mainGuest.surname}`;
       setSuccessData({ mainGuestName, qrCodes });
       setShowSuccess(true);
+      toast.success("Registration successful! Please check your email.");
     } catch (error) {
       console.error("Registration failed:", error);
-      alert("Registration failed. Please try again.");
+      toast.error("Registration failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
