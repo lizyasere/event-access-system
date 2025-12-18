@@ -111,29 +111,29 @@ export const QRScanner: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-500 to-yellow-500 p-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50 p-4 py-12">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-t-2xl p-6 shadow-lg">
-          <div className="flex items-center justify-center mb-4">
-            <div className="bg-orange-100 rounded-full p-4">
-              <Camera className="w-10 h-10 text-orange-600" />
+        <div className="bg-white rounded-t-3xl p-8 shadow-xl border border-gray-100">
+          <div className="flex items-center justify-center mb-6">
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-5 shadow-lg">
+              <Camera className="w-12 h-12 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">
+          <h1 className="text-4xl font-bold text-center text-gray-900 mb-3">
             Event Check-In Scanner
           </h1>
-          <p className="text-center text-gray-600">
+          <p className="text-center text-lg text-gray-600">
             30th Anniversary Celebration
           </p>
         </div>
 
         {/* Scanner Setup */}
         {!isScanning ? (
-          <div className="bg-white p-6 shadow-lg">
-            <div className="space-y-4">
+          <div className="bg-white p-8 shadow-xl border-x border-gray-100">
+            <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-800 mb-3">
                   Scanner Name (Protocol Officer)
                 </label>
                 <input
@@ -141,18 +141,18 @@ export const QRScanner: React.FC = () => {
                   value={scannerName}
                   onChange={(e) => setScannerName(e.target.value)}
                   placeholder="Enter your name"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-800 mb-3">
                   Event Day
                 </label>
                 <select
                   value={selectedDay}
                   onChange={(e) => setSelectedDay(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                 >
                   {API_CONFIG.EVENT_DAYS.map((day) => (
                     <option key={day} value={day}>
@@ -163,15 +163,15 @@ export const QRScanner: React.FC = () => {
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-800">{error}</p>
+                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-5 flex items-start gap-4">
+                  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm font-medium text-red-800">{error}</p>
                 </div>
               )}
 
               <button
                 onClick={startScanning}
-                className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 text-white py-4 rounded-lg font-bold text-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-[1.02] transition-all flex items-center justify-center gap-3"
               >
                 <Camera className="w-6 h-6" />
                 Start Scanning
@@ -182,23 +182,23 @@ export const QRScanner: React.FC = () => {
           <>
             {/* QR Scanner Display */}
             {!scannedGuest && (
-              <div className="bg-white p-6 shadow-lg">
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      Scanning for: {selectedDay}
+              <div className="bg-white p-8 shadow-xl border-x border-gray-100">
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4 p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl border border-orange-200">
+                    <span className="text-sm font-bold text-gray-900">
+                      📅 {selectedDay}
                     </span>
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm font-medium text-gray-700">
                       Officer: {scannerName}
                     </span>
                   </div>
                 </div>
 
-                <div id="qr-reader" className="rounded-lg overflow-hidden"></div>
+                <div id="qr-reader" className="rounded-2xl overflow-hidden border-4 border-orange-200"></div>
 
                 <button
                   onClick={stopScanning}
-                  className="w-full mt-4 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300 transition"
+                  className="w-full mt-6 bg-gray-200 text-gray-800 py-4 rounded-xl font-bold hover:bg-gray-300 transition-all"
                 >
                   Stop Scanning
                 </button>
@@ -207,22 +207,22 @@ export const QRScanner: React.FC = () => {
 
             {/* Check-In Result */}
             {checkInResult && scannedGuest && (
-              <div className="bg-white rounded-b-2xl shadow-lg overflow-hidden">
+              <div className="bg-white rounded-b-3xl shadow-xl overflow-hidden border border-gray-100">
                 {/* Success/Error Banner */}
                 {checkInResult.success ? (
-                  <div className="bg-green-500 p-4">
-                    <div className="flex items-center justify-center gap-2 text-white">
-                      <CheckCircle2 className="w-6 h-6" />
-                      <span className="font-bold text-lg">
+                  <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-6">
+                    <div className="flex items-center justify-center gap-3 text-white">
+                      <CheckCircle2 className="w-8 h-8" strokeWidth={3} />
+                      <span className="font-bold text-2xl">
                         Check-In Successful!
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-red-500 p-4">
-                    <div className="flex items-center justify-center gap-2 text-white">
-                      <XCircle className="w-6 h-6" />
-                      <span className="font-bold text-lg">
+                  <div className="bg-gradient-to-r from-red-500 to-rose-600 p-6">
+                    <div className="flex items-center justify-center gap-3 text-white">
+                      <XCircle className="w-8 h-8" strokeWidth={3} />
+                      <span className="font-bold text-2xl">
                         {checkInResult.alreadyCheckedIn
                           ? "Already Checked In"
                           : "Check-In Failed"}
@@ -235,10 +235,10 @@ export const QRScanner: React.FC = () => {
                 <GuestDetails guest={scannedGuest} day={selectedDay} />
 
                 {/* Actions */}
-                <div className="p-6 bg-gray-50">
+                <div className="p-8 bg-gradient-to-br from-gray-50 to-orange-50">
                   <button
                     onClick={resetScanner}
-                    className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 text-white py-3 rounded-lg font-bold hover:shadow-lg transition"
+                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-[1.02] transition-all"
                   >
                     Scan Next Guest
                   </button>
@@ -248,17 +248,17 @@ export const QRScanner: React.FC = () => {
 
             {/* Error Display */}
             {error && !scannedGuest && (
-              <div className="bg-white p-6 rounded-b-2xl shadow-lg">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="bg-white p-8 rounded-b-3xl shadow-xl border border-gray-100">
+                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 flex items-start gap-4">
+                  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-red-900">Error</p>
+                    <p className="text-base font-bold text-red-900 mb-1">Error</p>
                     <p className="text-sm text-red-700">{error}</p>
                   </div>
                 </div>
                 <button
                   onClick={resetScanner}
-                  className="w-full mt-4 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300 transition"
+                  className="w-full mt-6 bg-gray-200 text-gray-800 py-4 rounded-xl font-bold hover:bg-gray-300 transition-all"
                 >
                   Try Again
                 </button>

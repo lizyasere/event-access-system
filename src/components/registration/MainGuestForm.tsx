@@ -3,12 +3,11 @@ import type { UseFormRegister, FieldErrors } from "react-hook-form";
 import { UserPlus, Mail, Phone, Building2, Briefcase } from "lucide-react";
 import { Input } from "../shared/Input";
 import { Select } from "../shared/Select";
-import { RadioGroup } from "../shared/RadioGroup";
-import type { RegistrationFormData } from "../../types";
+import type { RegistrationFormInput } from "../../types";
 
 interface MainGuestFormProps {
-  register: UseFormRegister<RegistrationFormData>;
-  errors: FieldErrors<RegistrationFormData>;
+  register: UseFormRegister<RegistrationFormInput>;
+  errors: FieldErrors<RegistrationFormInput>;
 }
 
 export const MainGuestForm: React.FC<MainGuestFormProps> = ({
@@ -18,13 +17,20 @@ export const MainGuestForm: React.FC<MainGuestFormProps> = ({
   const titleOptions = ["Dr.", "Rev.", "Pastor", "Mr.", "Mrs.", "Ms.", "Prof."];
 
   return (
-    <div className="mb-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-        <UserPlus className="w-6 h-6 text-orange-500" />
-        Main Guest Information
-      </h2>
+    <div className="mb-10">
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-orange-100">
+        <div className="p-2 rounded-lg bg-orange-100">
+          <UserPlus className="w-6 h-6 text-orange-600" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Main Guest Information
+          </h2>
+          <p className="text-sm text-gray-600">Please provide your details</p>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Select
           label="Title"
           options={titleOptions}
@@ -64,52 +70,43 @@ export const MainGuestForm: React.FC<MainGuestFormProps> = ({
         />
       </div>
 
-      <Input
-        label="Position"
-        icon={<Briefcase className="w-5 h-5" />}
-        {...register("mainGuest.position")}
-        error={errors.mainGuest?.position?.message}
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-        <RadioGroup
-          label="Coming with spouse?"
-          options={[
-            { label: "Yes", value: "true" },
-            { label: "No", value: "false" },
-          ]}
-          {...register("mainGuest.withSpouse", {
-            setValueAs: (v) => v === "true",
-          })}
-        />
-        <RadioGroup
-          label="Coming with car?"
-          options={[
-            { label: "Yes", value: "true" },
-            { label: "No", value: "false" },
-          ]}
-          {...register("mainGuest.withCar", {
-            setValueAs: (v) => v === "true",
-          })}
+      <div className="mt-6">
+        <Input
+          label="Position"
+          icon={<Briefcase className="w-5 h-5" />}
+          {...register("mainGuest.position")}
+          error={errors.mainGuest?.position?.message}
         />
       </div>
 
-      <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Number of Associates
-        </label>
-        <input
-          type="number"
-          min="0"
-          max="10"
-          {...register("mainGuest.numAssociates", { valueAsNumber: true })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <Select
+          label="Coming with spouse?"
+          options={["Yes", "No"]}
+          {...register("mainGuest.withSpouse", {
+            setValueAs: (v) => v === "Yes",
+          })}
+          error={errors.mainGuest?.withSpouse?.message}
         />
-        {errors.mainGuest?.numAssociates && (
-          <p className="mt-1 text-sm text-red-600">
-            {errors.mainGuest.numAssociates.message}
-          </p>
-        )}
+        <Select
+          label="Coming with car?"
+          options={["Yes", "No"]}
+          {...register("mainGuest.withCar", {
+            setValueAs: (v) => v === "Yes",
+          })}
+          error={errors.mainGuest?.withCar?.message}
+        />
+      </div>
+
+      <div className="mt-6">
+        <Select
+          label="Number of Associates"
+          options={["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]}
+          {...register("mainGuest.numAssociates", { 
+            setValueAs: (v) => parseInt(v) || 0 
+          })}
+          error={errors.mainGuest?.numAssociates?.message}
+        />
       </div>
     </div>
   );

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { UserPlus, Users, Check, Loader2 } from "lucide-react";
-import type { RegistrationFormData } from "../../types";
+import { Users, Check, Loader2 } from "lucide-react";
+import type { RegistrationFormData, RegistrationFormInput } from "../../types";
 import { registrationSchema } from "../../types";
 import { apiService } from "../../services/api";
 import { qrService } from "../../services/qr";
@@ -10,7 +10,6 @@ import { MainGuestForm } from "./MainGuestForm";
 import { AssociateForm } from "./AssociateForm";
 import { SuccessScreen } from "./SuccessScreen";
 import { emailService } from "../../services/email";
-
 
 export const RegistrationForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,8 +25,9 @@ export const RegistrationForm: React.FC = () => {
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors },
-  } = useForm<RegistrationFormData>({
+  } = useForm<RegistrationFormInput, unknown, RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
     defaultValues: {
       mainGuest: {
@@ -72,11 +72,17 @@ export const RegistrationForm: React.FC = () => {
     }
   }, [numAssociates, fields.length, append, remove]);
 
+  const handleRemoveAssociate = (index: number) => {
+    remove(index);
+    const updatedCount = Math.max((numAssociates || 0) - 1, 0);
+    setValue("mainGuest.numAssociates", updatedCount);
+  };
+
   const onSubmit = async (data: RegistrationFormData) => {
     setIsSubmitting(true);
     try {
       const response = await apiService.registerGuests(data);
-      
+
       if (!response.success) {
         throw new Error(response.message || "Registration failed");
       }
@@ -114,59 +120,82 @@ export const RegistrationForm: React.FC = () => {
   }
 
   return (
-    <div className="bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-gradient-to-r from-orange-500 to-yellow-500 rounded-t-2xl p-8 text-white">
-          <div className="flex items-center justify-center mb-4">
-            <div className="bg-white bg-opacity-20 rounded-full p-4">
-              <UserPlus className="w-12 h-12" />
-            </div>
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-center mb-2">
-            30th Anniversary Celebration
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50 py-6 px-4">
+      <div className="max-w-5xl mx-auto">
+        {/* Elegant Header */}
+        <div className="text-center mb-10">
+          {/* <div className="inline-flex items-center justify-center w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-lg mb-6">
+            <UserPlus className="w-5 h-5 text-white" />
+          </div> */}
+          <h1 className=" font-bold text-gray-900 mb-3">
+            Guest Registration
           </h1>
-          <p className="text-center text-white text-opacity-90">
-            VIP Guest Registration
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Join us for the 30th Anniversary Celebration. Please fill in your details below to receive your personalized QR access codes.
           </p>
         </div>
 
-        <div className="bg-white rounded-b-2xl shadow-xl p-8">
-          <MainGuestForm register={register} errors={errors} />
+        {/* Form Card */}
+        <div className="bg-white rounded-2xl shadow-xl border border-orange-100 overflow-hidden">
+          <div className="p-8 md:p-12">
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <MainGuestForm register={register} errors={errors} />
 
-          {fields.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Users className="w-6 h-6 text-orange-500" />
-                Associates ({fields.length})
-              </h2>
-              {fields.map((field, index) => (
-                <AssociateForm
-                  key={field.id}
-                  index={index}
-                  register={register}
-                  errors={errors}
-                />
-              ))}
-            </div>
-          )}
+              {fields.length > 0 && (
+                <div className="mb-8 pt-8 border-t border-gray-200">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 rounded-lg bg-orange-100">
+                      <Users className="w-6 h-6 text-orange-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        Associates
+                      </h2>
+                      <p className="text-sm text-gray-600">
+                        {fields.length} {fields.length === 1 ? 'person' : 'people'} registered
+                      </p>
+                    </div>
+                  </div>
+                  {fields.map((field, index) => (
+                    <AssociateForm
+                      key={field.id}
+                      index={index}
+                      register={register}
+                      errors={errors}
+                      onRemove={() => handleRemoveAssociate(index)}
+                    />
+                  ))}
+                </div>
+              )}
 
-          <button
-            onClick={handleSubmit(onSubmit)}
-            disabled={isSubmitting}
-            className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 text-white py-4 rounded-lg font-bold text-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-6 h-6 animate-spin" />
-                Processing Registration...
-              </>
-            ) : (
-              <>
-                <Check className="w-6 h-6" />
-                Complete Registration
-              </>
-            )}
-          </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-3"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    Processing Your Registration...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-6 h-6" />
+                    Complete Registration
+                  </>
+                )}
+              </button>
+
+              <p className="text-center text-sm text-gray-500 mt-4">
+                By registering, you'll receive QR codes via email for event access
+              </p>
+            </form>
+          </div>
+        </div>
+
+        {/* Trust Indicators */}
+        <div className="mt-8 text-center text-sm text-gray-600">
+          <p> Your information is secure and will only be used for this event</p>
         </div>
       </div>
     </div>

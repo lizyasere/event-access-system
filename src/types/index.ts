@@ -8,8 +8,8 @@ export const mainGuestSchema = z.object({
   email: z.string().email("Invalid email address"),
   churchName: z.string().min(2, "Church name is required"),
   position: z.string().min(2, "Position is required"),
-  withSpouse: z.boolean(),
-  withCar: z.boolean(),
+  withSpouse: z.boolean().default(false),
+  withCar: z.boolean().default(false),
   numAssociates: z.number().min(0).max(10, "Maximum 10 associates allowed"),
 });
 
@@ -18,7 +18,7 @@ export const associateSchema = z.object({
   surname: z.string().min(2, "Surname required"),
   firstName: z.string().min(2, "First name required"),
   phone: z.string().regex(/^\+?[0-9]{10,15}$/, "Invalid phone number"),
-  withCar: z.boolean(),
+  withCar: z.boolean().default(false),
 });
 
 export const registrationSchema = z.object({
@@ -27,6 +27,7 @@ export const registrationSchema = z.object({
 });
 
 export type RegistrationFormData = z.infer<typeof registrationSchema>;
+export type RegistrationFormInput = z.input<typeof registrationSchema>;
 export type MainGuestData = z.infer<typeof mainGuestSchema>;
 export type AssociateData = z.infer<typeof associateSchema>;
 
