@@ -129,11 +129,11 @@ export const RegistrationForm: React.FC = () => {
           {/* <div className="inline-flex items-center justify-center w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-lg mb-6">
             <UserPlus className="w-5 h-5 text-white" />
           </div> */}
-          <h1 className=" font-bold text-gray-900 mb-3">
-            Guest Registration
-          </h1>
+          <h1 className=" font-bold text-gray-900 mb-3">Guest Registration</h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Join us for the 30th Anniversary Celebration. Please fill in your details below to receive your personalized QR access codes.
+            Thank you for accepting our invitation to the 30th Anniversary
+            Celebration. Please fill in your details below to receive your
+            personalized QR access codes.
           </p>
         </div>
 
@@ -154,7 +154,8 @@ export const RegistrationForm: React.FC = () => {
                         Associates
                       </h2>
                       <p className="text-sm text-gray-600">
-                        {fields.length} {fields.length === 1 ? 'person' : 'people'} registered
+                        {fields.length}{" "}
+                        {fields.length === 1 ? "person" : "people"} registered
                       </p>
                     </div>
                   </div>
@@ -189,7 +190,8 @@ export const RegistrationForm: React.FC = () => {
               </button>
 
               <p className="text-center text-sm text-gray-500 mt-4">
-                By registering, you'll receive QR codes via email for event access
+                By registering, you'll receive QR codes via email for event
+                access
               </p>
             </form>
           </div>
@@ -197,7 +199,10 @@ export const RegistrationForm: React.FC = () => {
 
         {/* Trust Indicators */}
         <div className="mt-8 text-center text-sm text-gray-600">
-          <p> Your information is secure and will only be used for this event</p>
+          <p>
+            {" "}
+            Your information is secure and will only be used for this event
+          </p>
         </div>
       </div>
     </div>
