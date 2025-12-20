@@ -28,9 +28,13 @@ const SHEET_NAMES = {
 };
 
 const CONFIG = {
-  BASE_URL: "YOUR_FRONTEND_URL", // Replace with your deployed frontend URL
+  BASE_URL: "https://cbcis30-invite.netlify.app",
   EMAIL_ENABLED: true,
-  EVENT_NAME: "30th Anniversary Celebration"
+  EVENT_NAME: "30th Anniversary Celebration",
+  EVENT_HOST: "Calvary Bible Church",
+  EVENT_DATE: "December 28, 2025 · 4:00 PM",
+  EVENT_GATE_TIME: "Gate opens by 3:30 PM",
+  EVENT_VENUE: "Plot A3C, Ikosi Road, Oregun, Ikeja, Lagos"
 };
 
 // ============================================================================
@@ -440,79 +444,105 @@ function getGuestByToken(token) {
  */
 function sendQRCodesEmail(email, mainGuestName, guests) {
   try {
-    const subject = `${CONFIG.EVENT_NAME} - Your QR Codes`;
-    
-    let htmlBody = `
+    const subject = "VIP Guest Logistics Guide - Calvary Bible Church";
+
+    const passCards = guests.map(guest => {
+      const passUrl = `${CONFIG.BASE_URL}/pass/${guest.token}`;
+      const qrUrl = `https://chart.googleapis.com/chart?chs=420x420&cht=qr&chl=${encodeURIComponent(guest.qrData.checkInUrl)}&choe=UTF-8`;
+      const guestType = guest.type === "VIP" ? "VIP Guest" : guest.type === "SPOUSE" ? "Spouse" : guest.type === "PA" ? "Personal Assistant" : "Associate";
+
+      return `
+        <div class="pass-card">
+          <div class="pass-chip">${guestType}</div>
+          <h3>${guest.name}</h3>
+          <div class="pass-meta">
+            <p>${CONFIG.EVENT_DATE}</p>
+            <p>${CONFIG.EVENT_GATE_TIME}</p>
+            <p>${CONFIG.EVENT_VENUE}</p>
+          </div>
+          <div class="pass-qr">
+            <img src="${qrUrl}" alt="QR code for ${guest.name}" />
+          </div>
+          <a href="${passUrl}" class="pass-link">View & Download Full Pass</a>
+        </div>
+      `;
+    }).join("\n");
+
+    const htmlBody = `
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="utf-8" />
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .qr-container { background: white; padding: 20px; margin: 15px 0; border-radius: 8px; text-align: center; border: 2px solid #FF6B35; }
-          .qr-title { font-size: 18px; font-weight: bold; color: #FF6B35; margin-bottom: 10px; }
-          .qr-link { display: inline-block; background: #FF6B35; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px; }
-          .instructions { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; color: #1f2937; }
+          .wrapper { max-width: 640px; margin: 0 auto; padding: 32px 20px; }
+          .hero { background: #111827; color: #fff; padding: 32px; border-radius: 24px; text-align: center; }
+          .hero .eyebrow { text-transform: uppercase; letter-spacing: 0.4em; font-size: 12px; color: #fbbf24; margin-bottom: 12px; }
+          .message { background: #ffffff; margin-top: 16px; padding: 28px; border-radius: 24px; line-height: 1.7; }
+          .logistics h4 { margin-bottom: 4px; color: #c2410c; text-transform: uppercase; letter-spacing: 0.25em; font-size: 12px; }
+          .logistics ul { padding-left: 18px; margin-top: 8px; margin-bottom: 16px; }
+          .logistics li { margin-bottom: 6px; }
+          .contact-card { background: #fffbeb; border: 1px solid #facc15; padding: 16px; border-radius: 16px; margin-top: 16px; font-weight: 600; }
+          .pass-card { background: #111827; color: #fff; border-radius: 32px; padding: 28px; margin-top: 24px; text-align: center; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35); }
+          .pass-chip { display: inline-block; background: rgba(255,255,255,0.1); border-radius: 999px; padding: 6px 18px; letter-spacing: 0.3em; font-size: 11px; text-transform: uppercase; }
+          .pass-card h3 { font-size: 26px; margin: 16px 0 8px; }
+          .pass-meta { font-size: 14px; line-height: 1.4; color: #e5e7eb; }
+          .pass-qr { background: #fff; padding: 18px; border-radius: 24px; margin: 20px auto; width: fit-content; }
+          .pass-qr img { width: 220px; height: 220px; display: block; }
+          .pass-link { display: inline-block; margin-top: 8px; padding: 12px 24px; background: #f97316; color: #fff; text-decoration: none; border-radius: 999px; font-weight: 600; }
+          .footer { text-align: center; margin-top: 28px; font-size: 12px; color: #6b7280; }
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <h1>${CONFIG.EVENT_NAME}</h1>
-            <p>Your Event Access QR Codes</p>
+        <div class="wrapper">
+          <div class="hero">
+            <p class="eyebrow">${CONFIG.EVENT_HOST}</p>
+            <h1>VIP Guest Logistics Guide</h1>
+            <p>${CONFIG.EVENT_NAME}</p>
           </div>
-          <div class="content">
+
+          <div class="message">
             <p>Dear ${mainGuestName},</p>
-            <p>Thank you for registering for the ${CONFIG.EVENT_NAME}. Your QR codes are ready!</p>
-            
-            <div class="instructions">
-              <strong>Important Instructions:</strong>
+            <p>We are delighted to welcome you as our VIP Guest at the Anniversary Celebration on December 28, at 4:00 PM prompt. Our team will be on ground from 3:30 PM to ensure a seamless and memorable experience. Kindly review the brief logistics below.</p>
+
+            <div class="logistics">
+              <h4>VIP Guest</h4>
               <ul>
-                <li>Each person has their own unique QR code</li>
-                <li>Save these links or take screenshots</li>
-                <li>Present your QR code at the venue entrance</li>
-                <li>QR codes are valid for all event days</li>
+                <li>E-Access Card: Attached for you and your listed associates/PA. Please present it (printed or digital) on arrival.</li>
+                <li>Arrival & Drop-Off: Proceed to the main gate, present your E-Access Card, and you will be directed to the drop-off point. Our Protocol Team will escort you and your spouse to your seats.</li>
+                <li>Parking: Your vehicle will be guided to the designated VIP parking area.</li>
+              </ul>
+
+              <h4>VIP Associates</h4>
+              <ul>
+                <li>Arrival & Entry: Associates should present their E-Access Cards at the main gate, park as directed, and receive wristbands from the Protocol Team.</li>
               </ul>
             </div>
-    `;
-    
-    guests.forEach(guest => {
-      htmlBody += `
-        <div class="qr-container">
-          <div class="qr-title">${guest.name}</div>
-          <p><strong>Guest Type:</strong> ${guest.type}</p>
-          <a href="${guest.qrData.checkInUrl}" class="qr-link">Open QR Code</a>
-          <p style="font-size: 11px; color: #666; margin-top: 10px;">
-            Link: ${guest.qrData.checkInUrl}
-          </p>
-        </div>
-      `;
-    });
-    
-    htmlBody += `
-            <p style="margin-top: 30px;">We look forward to seeing you at the celebration!</p>
-            <div class="footer">
-              <p>${CONFIG.EVENT_NAME}</p>
-              <p>This is an automated email. Please do not reply.</p>
+
+            <div class="contact-card">
+              For inquiries, please contact Mr. Femi Adelugba on 0803 451 3465 or Mr. Excellence Aliu on 0806 622 7712.
             </div>
+
+            <p style="margin-top: 18px;">We look forward to receiving you.</p>
           </div>
+
+          ${passCards}
+
+          <p class="footer">${CONFIG.EVENT_HOST} Protocol Team · This is an automated email.</p>
         </div>
       </body>
       </html>
     `;
-    
+
     MailApp.sendEmail({
       to: email,
       subject: subject,
       htmlBody: htmlBody
     });
-    
+
     Logger.log(`Email sent successfully to ${email}`);
     return true;
-    
+
   } catch (error) {
     Logger.log(`Email send error: ${error.toString()}`);
     return false;

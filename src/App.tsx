@@ -4,6 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { RegistrationForm } from './components/registration/RegistrationForm';
 import { QRScanner } from './components/scanner/QRScanner';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { GuestPass } from './components/pass/GuestPass';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 
@@ -19,6 +20,7 @@ function App() {
               <Route path="/register" element={<RegistrationForm />} />
               <Route path="/scan" element={<QRScanner />} />
               <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/pass/:token" element={<GuestPass />} />
               <Route path="/checkin/:token" element={<QRScanner />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -1,0 +1,191 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { QRCodeCanvas } from "qrcode.react";
+import { Download, Copy, Loader2 } from "lucide-react";
+import { toast } from "react-toastify";
+import type { GuestData } from "../../types";
+import { apiService } from "../../services/api";
+import { API_CONFIG } from "../../config/api";
+
+const EVENT_DETAILS = {
+  name: "30th Anniversary Celebration",
+  host: "Calvary Bible Church",
+  date: "December 28, 2025 · 4:00 PM",
+  gateOpen: "Gate opens by 3:30 PM",
+  venue: "Plot A3C, Ikosi Road, Oregun, Ikeja, Lagos",
+};
+
+export const GuestPass: React.FC = () => {
+  const { token } = useParams<{ token: string }>();
+  const [guest, setGuest] = useState<GuestData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const styleId = "guest-pass-print-style";
+    if (document.getElementById(styleId)) {
+      return;
+    }
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.innerHTML = `
+      @media print {
+        body { background: #fff !important; }
+        body * { visibility: hidden; }
+        #guest-pass-print-root, #guest-pass-print-root * { visibility: visible; }
+        #guest-pass-print-root { position: absolute; inset: 0; margin: 0 !important; width: 100%; }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      const existing = document.getElementById(styleId);
+      if (existing) {
+        document.head.removeChild(existing);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      setError("Missing pass token");
+      setIsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const data = await apiService.getGuestByToken(token);
+        if (!isMounted) return;
+        if (!data) {
+          setError("Guest not found or link expired");
+        } else {
+          setGuest(data);
+        }
+      } catch (err) {
+        console.error("Unable to load pass", err);
+        if (isMounted) {
+          setError("Unable to load pass. Please try again.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
+
+  const passLink = useMemo(() => {
+    if (typeof window === "undefined" || !token) return "";
+    return `${window.location.origin}/pass/${token}`;
+  }, [token]);
+
+  const qrValue = useMemo(() => {
+    const baseUrl = API_CONFIG.CHECK_IN_BASE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+    return token ? `${baseUrl}/checkin/${token}` : "";
+  }, [token]);
+
+  const handleCopyLink = async () => {
+    if (!passLink) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(passLink);
+        toast.success("Pass link copied");
+      } else {
+        throw new Error("Clipboard unsupported");
+      }
+    } catch (err) {
+      console.error("Copy failed", err);
+      toast.error("Unable to copy link. Please copy manually.");
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    window.print();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !guest) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center text-center px-6">
+        <p className="text-xl font-semibold text-gray-800 mb-4">{error || "Guest not found"}</p>
+        <Link to="/" className="text-orange-600 font-medium underline">
+          Go back to registration
+        </Link>
+      </div>
+    );
+  }
+
+  const guestTypeLabel = guest.type === "VIP" ? "VIP" : guest.type === "SPOUSE" ? "Spouse" : guest.type === "PA" ? "Personal Assistant" : "Associate";
+
+  return (
+    <div className="min-h-screen bg-slate-100 py-12 px-4">
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="text-center space-y-2">
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Digital access card</p>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900">{EVENT_DETAILS.name}</h1>
+          <p className="text-lg text-slate-600">Presented by {EVENT_DETAILS.host}</p>
+        </div>
+
+        <div id="guest-pass-print-root" className="mx-auto bg-white shadow-2xl rounded-[36px] border-4 border-slate-900 overflow-hidden">
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white px-10 py-8 text-center">
+            <p className="text-sm uppercase tracking-[0.35em] text-orange-300">VIP ACCESS</p>
+            <h2 className="text-4xl font-black mt-2">{guest.fullName}</h2>
+            <p className="text-lg text-slate-200 mt-3">{guestTypeLabel} · Code: {guest.token}</p>
+          </div>
+
+          <div className="px-10 py-8 space-y-8">
+            <div className="bg-slate-50 rounded-3xl p-6 text-center border border-slate-200">
+              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Event schedule</p>
+              <h3 className="text-2xl font-semibold text-slate-900 mt-2">{EVENT_DETAILS.date}</h3>
+              <p className="text-slate-600">{EVENT_DETAILS.gateOpen}</p>
+              <p className="text-slate-600 mt-2">{EVENT_DETAILS.venue}</p>
+            </div>
+
+            <div className="flex flex-col items-center gap-4">
+              <QRCodeCanvas value={qrValue} size={240} includeMargin bgColor="#ffffff" fgColor="#111827" />
+              <p className="text-sm text-slate-500">Show this QR code at the gate for verification.</p>
+            </div>
+
+            <div className="bg-orange-50 rounded-2xl p-5 text-center border border-orange-200">
+              <p className="text-sm uppercase tracking-[0.35em] text-orange-600">Logistics</p>
+              <p className="text-orange-900 font-semibold mt-2">Protocol and StarGuard teams will be on ground from 3:30 PM.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            className="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white px-6 py-3 font-semibold hover:bg-slate-800 transition"
+          >
+            <Download className="w-4 h-4" />
+            Download / Print PDF
+          </button>
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="inline-flex items-center gap-2 rounded-full border-2 border-slate-900 text-slate-900 px-6 py-3 font-semibold hover:bg-slate-900 hover:text-white transition"
+          >
+            <Copy className="w-4 h-4" />
+            Copy pass link
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default GuestPass;

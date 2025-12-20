@@ -14,7 +14,18 @@ export const MainGuestForm: React.FC<MainGuestFormProps> = ({
   register,
   errors,
 }) => {
-  const titleOptions = ["Dr.", "Rev.", "Pastor", "Mr.", "Mrs.", "Ms.", "Prof."];
+  const titleOptions = [
+    "Rev.",
+    "Pastor",
+    "Apostle",
+    "Bishop",
+    "Dr.",
+    "Engr.",
+    "Mr.",
+    "Mrs.",
+    "Ms.",
+    "Prof.",
+  ];
 
   return (
     <div className="mb-10">
@@ -102,8 +113,8 @@ export const MainGuestForm: React.FC<MainGuestFormProps> = ({
         <Select
           label="Number of Associates"
           options={["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]}
-          {...register("mainGuest.numAssociates", { 
-            setValueAs: (v) => parseInt(v) || 0 
+          {...register("mainGuest.numAssociates", {
+            setValueAs: (v) => parseInt(v) || 0,
           })}
           error={errors.mainGuest?.numAssociates?.message}
         />
