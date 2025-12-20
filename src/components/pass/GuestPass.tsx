@@ -12,7 +12,8 @@ const EVENT_DETAILS = {
   host: "Calvary Bible Church",
   date: "December 28, 2025 · 4:00 PM",
   gateOpen: "Gate opens by 3:30 PM",
-  venue: "Plot A3C, Ikosi Road, Oregun, Ikeja, Lagos",
+  venue:
+    "Rehoboth Multi-Purpose Hall, Calvary Bus Stop, Ikotun, 257 Ikotun - Idimu Rd, Ikotun, Lagos",
 };
 
 export const GuestPass: React.FC = () => {
@@ -85,7 +86,9 @@ export const GuestPass: React.FC = () => {
   }, [token]);
 
   const qrValue = useMemo(() => {
-    const baseUrl = API_CONFIG.CHECK_IN_BASE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+    const baseUrl =
+      API_CONFIG.CHECK_IN_BASE_URL ||
+      (typeof window !== "undefined" ? window.location.origin : "");
     return token ? `${baseUrl}/checkin/${token}` : "";
   }, [token]);
 
@@ -119,7 +122,9 @@ export const GuestPass: React.FC = () => {
   if (error || !guest) {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center text-center px-6">
-        <p className="text-xl font-semibold text-gray-800 mb-4">{error || "Guest not found"}</p>
+        <p className="text-xl font-semibold text-gray-800 mb-4">
+          {error || "Guest not found"}
+        </p>
         <Link to="/" className="text-orange-600 font-medium underline">
           Go back to registration
         </Link>
@@ -127,40 +132,76 @@ export const GuestPass: React.FC = () => {
     );
   }
 
-  const guestTypeLabel = guest.type === "VIP" ? "VIP" : guest.type === "SPOUSE" ? "Spouse" : guest.type === "PA" ? "Personal Assistant" : "Associate";
+  const guestTypeLabel =
+    guest.type === "VIP"
+      ? "VIP"
+      : guest.type === "SPOUSE"
+      ? "Spouse"
+      : guest.type === "PA"
+      ? "Personal Assistant"
+      : "Associate";
 
   return (
     <div className="min-h-screen bg-slate-100 py-12 px-4">
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="text-center space-y-2">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Digital access card</p>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900">{EVENT_DETAILS.name}</h1>
-          <p className="text-lg text-slate-600">Presented by {EVENT_DETAILS.host}</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">
+            Digital access card
+          </p>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900">
+            {EVENT_DETAILS.name}
+          </h1>
+          <p className="text-lg text-slate-600">
+            Presented by {EVENT_DETAILS.host}
+          </p>
         </div>
 
-        <div id="guest-pass-print-root" className="mx-auto bg-white shadow-2xl rounded-[36px] border-4 border-slate-900 overflow-hidden">
+        <div
+          id="guest-pass-print-root"
+          className="mx-auto bg-white shadow-2xl rounded-[36px] border-4 border-slate-900 overflow-hidden"
+        >
           <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white px-10 py-8 text-center">
-            <p className="text-sm uppercase tracking-[0.35em] text-orange-300">VIP ACCESS</p>
+            <p className="text-sm uppercase tracking-[0.35em] text-orange-300">
+              VIP ACCESS
+            </p>
             <h2 className="text-4xl font-black mt-2">{guest.fullName}</h2>
-            <p className="text-lg text-slate-200 mt-3">{guestTypeLabel} · Code: {guest.token}</p>
+            <p className="text-lg text-slate-200 mt-3">
+              {guestTypeLabel} · Code: {guest.token}
+            </p>
           </div>
 
           <div className="px-10 py-8 space-y-8">
             <div className="bg-slate-50 rounded-3xl p-6 text-center border border-slate-200">
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Event schedule</p>
-              <h3 className="text-2xl font-semibold text-slate-900 mt-2">{EVENT_DETAILS.date}</h3>
+              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">
+                Event schedule
+              </p>
+              <h3 className="text-2xl font-semibold text-slate-900 mt-2">
+                {EVENT_DETAILS.date}
+              </h3>
               <p className="text-slate-600">{EVENT_DETAILS.gateOpen}</p>
               <p className="text-slate-600 mt-2">{EVENT_DETAILS.venue}</p>
             </div>
 
             <div className="flex flex-col items-center gap-4">
-              <QRCodeCanvas value={qrValue} size={240} includeMargin bgColor="#ffffff" fgColor="#111827" />
-              <p className="text-sm text-slate-500">Show this QR code at the gate for verification.</p>
+              <QRCodeCanvas
+                value={qrValue}
+                size={240}
+                includeMargin
+                bgColor="#ffffff"
+                fgColor="#111827"
+              />
+              <p className="text-sm text-slate-500">
+                Show this QR code at the gate for verification.
+              </p>
             </div>
 
             <div className="bg-orange-50 rounded-2xl p-5 text-center border border-orange-200">
-              <p className="text-sm uppercase tracking-[0.35em] text-orange-600">Logistics</p>
-              <p className="text-orange-900 font-semibold mt-2">Protocol and StarGuard teams will be on ground from 3:30 PM.</p>
+              <p className="text-sm uppercase tracking-[0.35em] text-orange-600">
+                Logistics
+              </p>
+              <p className="text-orange-900 font-semibold mt-2">
+                Protocol and StarGuard teams will be on ground from 3:30 PM.
+              </p>
             </div>
           </div>
         </div>
