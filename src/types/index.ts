@@ -18,6 +18,11 @@ export const associateSchema = z.object({
   surname: z.string().min(2, "Surname required"),
   firstName: z.string().min(2, "First name required"),
   phone: z.string().regex(/^\+?[0-9]{10,15}$/, "Invalid phone number"),
+  email: z
+    .preprocess((val) => (typeof val === "string" ? val.trim() : val),
+      z.union([z.string().email("Invalid email address"), z.literal("")])
+    )
+    .optional(),
   withCar: z.boolean().default(false),
 });
 
@@ -51,6 +56,10 @@ export interface GuestData {
   withCar: boolean;
   zone: string;
   registrationDate: string;
+  mainGuestId?: string;
+  hostName?: string;
+  hostPhone?: string;
+  hostEmail?: string;
   checkIns: {
     day: string;
     timestamp: string;

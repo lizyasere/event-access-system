@@ -63,6 +63,7 @@ export const RegistrationForm: React.FC = () => {
           surname: "",
           firstName: "",
           phone: "",
+          email: "",
           withCar: false,
         });
       }

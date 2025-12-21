@@ -8,6 +8,7 @@ import {
   MapPin,
   Calendar,
   CheckCircle2,
+  Users,
 } from "lucide-react";
 import type { GuestData } from "../../types";
 import { getZoneColorClass } from "../../utils/seating";
@@ -38,6 +39,7 @@ export const GuestDetails: React.FC<GuestDetailsProps> = ({ guest, day }) => {
 
   const typeDisplay = getGuestTypeDisplay(guest.type);
   const hasCheckedInToday = guest.checkIns.some((ci) => ci.day === day);
+  const isHostedGuest = guest.type !== "VIP" && !!guest.hostName;
 
   return (
     <div className="p-8">
@@ -70,6 +72,44 @@ export const GuestDetails: React.FC<GuestDetailsProps> = ({ guest, day }) => {
         </div>
         <p className="text-center text-3xl font-black">{guest.zone}</p>
       </div>
+
+      {isHostedGuest && (
+        <div className="mb-8 p-6 rounded-2xl border-2 border-amber-200 bg-amber-50/60 shadow-sm">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-3 rounded-2xl bg-amber-100 text-amber-700">
+              <Users className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
+                Hosted Guest
+              </p>
+              <p className="text-base font-bold text-amber-900">
+                Reporting to {guest.hostName}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {guest.hostPhone && (
+              <div className="p-4 rounded-xl bg-white border border-amber-100">
+                <p className="text-xs text-amber-700 font-semibold uppercase tracking-wide">
+                  Host Phone
+                </p>
+                <p className="font-bold text-gray-900">{guest.hostPhone}</p>
+              </div>
+            )}
+            {guest.hostEmail && (
+              <div className="p-4 rounded-xl bg-white border border-amber-100">
+                <p className="text-xs text-amber-700 font-semibold uppercase tracking-wide">
+                  Host Email
+                </p>
+                <p className="font-bold text-gray-900 break-all">
+                  {guest.hostEmail}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Guest Information Grid */}
       <div className="space-y-4 mb-8">

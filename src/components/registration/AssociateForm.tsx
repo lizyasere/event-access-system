@@ -1,6 +1,6 @@
 import React from "react";
 import type { UseFormRegister, FieldErrors } from "react-hook-form";
-import { Phone, Trash2 } from "lucide-react";
+import { Phone, Mail, Trash2 } from "lucide-react";
 import { Input } from "../shared/Input";
 import { Select } from "../shared/Select";
 import type { RegistrationFormInput } from "../../types";
@@ -64,6 +64,14 @@ export const AssociateForm: React.FC<AssociateFormProps> = ({
           icon={<Phone className="w-5 h-5" />}
           {...register(`associates.${index}.phone`)}
           error={errors.associates?.[index]?.phone?.message}
+        />
+        <Input
+          label="Email (optional)"
+          type="email"
+          icon={<Mail className="w-5 h-5" />}
+          placeholder="name@example.com"
+          {...register(`associates.${index}.email`)}
+          error={errors.associates?.[index]?.email?.message}
         />
       </div>
 

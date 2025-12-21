@@ -34,7 +34,9 @@ const CONFIG = {
   EVENT_HOST: "Calvary Bible Church",
   EVENT_DATE: "December 28, 2025 · 4:00 PM",
   EVENT_GATE_TIME: "Gate opens by 3:30 PM",
-  EVENT_VENUE: "Plot A3C, Ikosi Road, Oregun, Ikeja, Lagos"
+  EVENT_VENUE: "Plot A3C, Ikosi Road, Oregun, Ikeja, Lagos",
+  EVENT_LOGO_URL: "https://cbcis30-invite.netlify.app/branding/cbc-logo.png",
+  EVENT_BANNER_URL: "https://cbcis30-invite.netlify.app/branding/vip-banner.svg"
 };
 
 // ============================================================================
@@ -244,6 +246,7 @@ function registerGuests(data) {
       const assocZone = assignSeatingZone(assocType);
       const assocId = generateGuestId(assocType);
       
+      const associateEmail = assoc.email && assoc.email.length > 0 ? assoc.email : mainGuest.email;
       guestSheet.appendRow([
         assocId,
         assocToken,
@@ -253,7 +256,7 @@ function registerGuests(data) {
         assoc.surname,
         assocName,
         assoc.phone,
-        mainGuest.email, // Use main guest's email
+        associateEmail,
         mainGuest.churchName,
         assocType === "PA" ? "Personal Assistant" : "Associate",
         assoc.withCar,
@@ -334,7 +337,7 @@ function checkInGuest(token, day, scannerName) {
     for (let i = 1; i < checkInData.length; i++) {
       if (checkInData[i][1] === guestRow[0] && checkInData[i][3] === day) {
         // Already checked in
-        const guest = buildGuestObject(guestRow, checkInData);
+        const guest = buildGuestObject(guestRow, checkInData, guestData);
         return {
           success: false,
           message: `Guest already checked in for ${day}`,
@@ -356,7 +359,7 @@ function checkInGuest(token, day, scannerName) {
       scannerName || "Unknown"
     ]);
     
-    const guest = buildGuestObject(guestRow, checkInSheet.getDataRange().getValues());
+    const guest = buildGuestObject(guestRow, checkInData, guestData);
     
     return {
       success: true,
@@ -379,7 +382,7 @@ function checkInGuest(token, day, scannerName) {
 /**
  * Build guest object from row data
  */
-function buildGuestObject(guestRow, checkInData) {
+function buildGuestObject(guestRow, checkInData, guestSheetData) {
   const checkIns = [];
   
   // Get all check-ins for this guest
@@ -390,6 +393,22 @@ function buildGuestObject(guestRow, checkInData) {
         timestamp: checkInData[i][4],
         scannerName: checkInData[i][5]
       });
+    }
+  }
+
+  const mainGuestId = guestRow[14] || guestRow[0];
+  let hostName = guestRow[6];
+  let hostPhone = guestRow[7];
+  let hostEmail = guestRow[8];
+
+  if (guestSheetData && mainGuestId) {
+    for (let i = 1; i < guestSheetData.length; i++) {
+      if (guestSheetData[i][0] === mainGuestId) {
+        hostName = guestSheetData[i][6];
+        hostPhone = guestSheetData[i][7];
+        hostEmail = guestSheetData[i][8];
+        break;
+      }
     }
   }
   
@@ -408,6 +427,10 @@ function buildGuestObject(guestRow, checkInData) {
     withCar: guestRow[11],
     zone: guestRow[12],
     registrationDate: guestRow[13],
+    mainGuestId: mainGuestId,
+    hostName: hostName,
+    hostPhone: hostPhone,
+    hostEmail: hostEmail,
     checkIns: checkIns
   };
 }
@@ -421,10 +444,11 @@ function getGuestByToken(token) {
     const checkInSheet = getOrCreateSheet(SHEET_NAMES.CHECK_INS);
     
     const guestData = guestSheet.getDataRange().getValues();
+    const checkInData = checkInSheet.getDataRange().getValues();
     
     for (let i = 1; i < guestData.length; i++) {
       if (guestData[i][1] === token) {
-        return buildGuestObject(guestData[i], checkInSheet.getDataRange().getValues());
+        return buildGuestObject(guestData[i], checkInData, guestData);
       }
     }
     
@@ -453,6 +477,7 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
 
       return `
         <div class="pass-card">
+          <img class="pass-logo" src="${CONFIG.EVENT_LOGO_URL}" alt="${CONFIG.EVENT_HOST} logo" />
           <div class="pass-chip">${guestType}</div>
           <h3>${guest.name}</h3>
           <div class="pass-meta">
@@ -476,15 +501,21 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
         <style>
           body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; color: #1f2937; }
           .wrapper { max-width: 640px; margin: 0 auto; padding: 32px 20px; }
-          .hero { background: #111827; color: #fff; padding: 32px; border-radius: 24px; text-align: center; }
+          .hero { position: relative; border-radius: 28px; overflow: hidden; text-align: center; }
+          .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(15,23,42,0.92), rgba(76,29,149,0.85)); }
+          .hero-overlay { position: relative; padding: 40px 32px; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+          .hero-logo { width: 86px; height: 86px; border-radius: 24px; background: rgba(255,255,255,0.08); padding: 12px; object-fit: contain; border: 1px solid rgba(255,255,255,0.2); }
           .hero .eyebrow { text-transform: uppercase; letter-spacing: 0.4em; font-size: 12px; color: #fbbf24; margin-bottom: 12px; }
           .message { background: #ffffff; margin-top: 16px; padding: 28px; border-radius: 24px; line-height: 1.7; }
           .logistics h4 { margin-bottom: 4px; color: #c2410c; text-transform: uppercase; letter-spacing: 0.25em; font-size: 12px; }
           .logistics ul { padding-left: 18px; margin-top: 8px; margin-bottom: 16px; }
           .logistics li { margin-bottom: 6px; }
           .contact-card { background: #fffbeb; border: 1px solid #facc15; padding: 16px; border-radius: 16px; margin-top: 16px; font-weight: 600; }
-          .pass-card { background: #111827; color: #fff; border-radius: 32px; padding: 28px; margin-top: 24px; text-align: center; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35); }
+          .pass-card { background: linear-gradient(135deg, #0f172a, #1e1b4b, #a21caf); color: #fff; border-radius: 32px; padding: 32px; margin-top: 24px; text-align: center; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35); position: relative; overflow: hidden; }
+          .pass-card::after { content: ""; position: absolute; inset: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 28px; pointer-events: none; }
+          .pass-card > * { position: relative; z-index: 1; }
           .pass-chip { display: inline-block; background: rgba(255,255,255,0.1); border-radius: 999px; padding: 6px 18px; letter-spacing: 0.3em; font-size: 11px; text-transform: uppercase; }
+          .pass-logo { width: 60px; height: 60px; margin: 0 auto 12px; border-radius: 16px; background: rgba(255,255,255,0.08); padding: 10px; object-fit: contain; border: 1px solid rgba(255,255,255,0.2); }
           .pass-card h3 { font-size: 26px; margin: 16px 0 8px; }
           .pass-meta { font-size: 14px; line-height: 1.4; color: #e5e7eb; }
           .pass-qr { background: #fff; padding: 18px; border-radius: 24px; margin: 20px auto; width: fit-content; }
@@ -495,10 +526,13 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
       </head>
       <body>
         <div class="wrapper">
-          <div class="hero">
-            <p class="eyebrow">${CONFIG.EVENT_HOST}</p>
-            <h1>VIP Guest Logistics Guide</h1>
-            <p>${CONFIG.EVENT_NAME}</p>
+          <div class="hero" style="background-image: url('${CONFIG.EVENT_BANNER_URL}'); background-size: cover; background-position: center;">
+            <div class="hero-overlay">
+              <img class="hero-logo" src="${CONFIG.EVENT_LOGO_URL}" alt="${CONFIG.EVENT_HOST} logo" />
+              <p class="eyebrow">${CONFIG.EVENT_HOST}</p>
+              <h1>VIP Guest Logistics Guide</h1>
+              <p>${CONFIG.EVENT_NAME}</p>
+            </div>
           </div>
 
           <div class="message">

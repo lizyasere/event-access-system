@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Html5Qrcode, type CameraDevice } from "html5-qrcode";
 import { Camera, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { qrService } from "../../services/qr";
 import { apiService } from "../../services/api";
@@ -14,81 +14,134 @@ export const QRScanner: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>(API_CONFIG.EVENT_DAYS[0]);
   const [scannerName, setScannerName] = useState<string>("");
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-  const scannerInitialized = useRef(false);
+  const [availableCameras, setAvailableCameras] = useState<CameraDevice[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isCameraPreparing, setIsCameraPreparing] = useState(false);
+  const cameraRef = useRef<Html5Qrcode | null>(null);
 
-  useEffect(() => {
-    if (isScanning && !scannerInitialized.current) {
-      scannerInitialized.current = true;
-
-      scannerRef.current = new Html5QrcodeScanner(
-        "qr-reader",
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
-        },
-        false
-      );
-
-      scannerRef.current.render(onScanSuccess, onScanError);
-    }
-
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(console.error);
-        scannerInitialized.current = false;
+  const onScanSuccess = useCallback(
+    async (decodedText: string) => {
+      if (cameraRef.current) {
+        cameraRef.current.pause(true);
       }
-    };
-  }, [isScanning]);
 
-  const onScanSuccess = async (decodedText: string) => {
-    // Stop scanner temporarily
-    if (scannerRef.current) {
-      scannerRef.current.pause(true);
-    }
+      setError(null);
+      setCheckInResult(null);
 
-    setError(null);
-    setCheckInResult(null);
+      const token = qrService.parseQRCodeUrl(decodedText) || decodedText;
 
-    // Extract token from URL
-    const token = qrService.parseQRCodeUrl(decodedText) || decodedText;
+      try {
+        const result = await apiService.checkInGuest({
+          token,
+          day: selectedDay,
+          scannerName: scannerName || undefined,
+        });
 
-    try {
-      // Check in the guest
-      const result = await apiService.checkInGuest({
-        token,
-        day: selectedDay,
-        scannerName: scannerName || undefined,
-      });
+        setCheckInResult(result);
+        setScannedGuest(result.guest || null);
 
-      setCheckInResult(result);
-      setScannedGuest(result.guest || null);
+        setTimeout(() => {
+          resetScanner();
+        }, 5000);
+      } catch (err) {
+        setError("Failed to process check-in. Please try again.");
+        console.error(err);
+        setTimeout(() => resetScanner(), 3000);
+      }
+    },
+    [selectedDay, scannerName]
+  );
 
-      // Auto-reset after 5 seconds
-      setTimeout(() => {
-        resetScanner();
-      }, 5000);
-    } catch (err) {
-      setError("Failed to process check-in. Please try again.");
-      console.error(err);
-      setTimeout(() => resetScanner(), 3000);
-    }
-  };
-
-  const onScanError = (errorMessage: string) => {
-    // Suppress continuous scan errors to avoid console spam
+  const onScanError = useCallback((errorMessage: string) => {
     if (!errorMessage.includes("No MultiFormat Readers")) {
       console.warn("QR Scan Error:", errorMessage);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isScanning) {
+      return;
+    }
+
+    let cancelled = false;
+    setIsCameraPreparing(true);
+    setCameraError(null);
+
+    Html5Qrcode.getCameras()
+      .then((devices) => {
+        if (cancelled) {
+          return;
+        }
+        if (!devices.length) {
+          setCameraError("No cameras detected on this device");
+          return;
+        }
+        setAvailableCameras(devices);
+        const preferred = devices.find((device) =>
+          /back|rear|environment/i.test(device.label)
+        );
+        setSelectedCameraId((prev) => prev || (preferred || devices[0]).id);
+      })
+      .catch((err) => {
+        console.error("Camera discovery failed", err);
+        if (!cancelled) {
+          setCameraError("Unable to access camera. Please allow permissions.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsCameraPreparing(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isScanning]);
+
+  useEffect(() => {
+    if (!isScanning || !selectedCameraId) {
+      return;
+    }
+
+    const html5QrCode = new Html5Qrcode("qr-reader");
+    cameraRef.current = html5QrCode;
+    setCameraError(null);
+
+    html5QrCode
+      .start(
+        { deviceId: { exact: selectedCameraId } },
+        {
+          fps: 12,
+          qrbox: { width: 260, height: 260 },
+          aspectRatio: 1.0,
+        },
+        onScanSuccess,
+        onScanError
+      )
+      .catch((err) => {
+        console.error("Unable to start camera", err);
+        setCameraError("Unable to start the selected camera. Please switch cameras.");
+      });
+
+    return () => {
+      cameraRef.current = null;
+      html5QrCode
+        .stop()
+        .catch(() => undefined)
+        .finally(() => {
+          html5QrCode.clear();
+        });
+    };
+  }, [isScanning, selectedCameraId, onScanSuccess, onScanError]);
 
   const resetScanner = () => {
     setScannedGuest(null);
     setCheckInResult(null);
     setError(null);
-    if (scannerRef.current) {
-      scannerRef.current.resume();
+    if (cameraRef.current && isScanning) {
+      cameraRef.current.resume();
     }
   };
 
@@ -99,15 +152,23 @@ export const QRScanner: React.FC = () => {
     }
     setIsScanning(true);
     setError(null);
+    setCameraError(null);
+    setScannedGuest(null);
+    setCheckInResult(null);
+  };
+
+  const handleCameraChange = (
+    event: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    setSelectedCameraId(event.target.value);
+    setScannedGuest(null);
+    setCheckInResult(null);
+    setError(null);
   };
 
   const stopScanning = () => {
     setIsScanning(false);
-    if (scannerRef.current) {
-      scannerRef.current.clear().catch(console.error);
-      scannerInitialized.current = false;
-      scannerRef.current = null;
-    }
+    setSelectedCameraId(null);
   };
 
   return (
@@ -192,6 +253,40 @@ export const QRScanner: React.FC = () => {
                       Officer: {scannerName}
                     </span>
                   </div>
+
+                  {availableCameras.length > 1 && (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
+                        Camera Source
+                      </label>
+                      <select
+                        value={selectedCameraId ?? ""}
+                        onChange={handleCameraChange}
+                        className="px-4 py-3 rounded-xl border-2 border-gray-200 focus:ring-2 focus:ring-orange-500"
+                      >
+                        {availableCameras.map((camera) => (
+                          <option key={camera.id} value={camera.id}>
+                            {camera.label || "Camera"}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500">
+                        Defaults to the rear camera when available.
+                      </p>
+                    </div>
+                  )}
+
+                  {isCameraPreparing && (
+                    <div className="mt-4 text-sm text-gray-600">
+                      Initializing camera...
+                    </div>
+                  )}
+
+                  {cameraError && (
+                    <div className="mt-4 bg-red-50 border-2 border-red-200 rounded-xl p-4 text-sm text-red-700">
+                      {cameraError}
+                    </div>
+                  )}
                 </div>
 
                 <div id="qr-reader" className="rounded-2xl overflow-hidden border-4 border-orange-200"></div>

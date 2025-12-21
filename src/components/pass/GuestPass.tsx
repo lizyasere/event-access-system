@@ -16,6 +16,9 @@ const EVENT_DETAILS = {
     "Rehoboth Multi-Purpose Hall, Calvary Bus Stop, Ikotun, 257 Ikotun - Idimu Rd, Ikotun, Lagos",
 };
 
+const LOGO_URL = "/branding/cbc-logo.png";
+const BANNER_URL = "/branding/vip-banner.svg";
+
 export const GuestPass: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const [guest, setGuest] = useState<GuestData | null>(null);
@@ -160,14 +163,42 @@ export const GuestPass: React.FC = () => {
           id="guest-pass-print-root"
           className="mx-auto bg-white shadow-2xl rounded-[36px] border-4 border-slate-900 overflow-hidden"
         >
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white px-10 py-8 text-center">
-            <p className="text-sm uppercase tracking-[0.35em] text-orange-300">
-              VIP ACCESS
-            </p>
-            <h2 className="text-4xl font-black mt-2">{guest.fullName}</h2>
-            <p className="text-lg text-slate-200 mt-3">
-              {guestTypeLabel} · Code: {guest.token}
-            </p>
+          <div
+            className="text-white px-10 py-8 text-center relative"
+            style={{
+              backgroundImage: `linear-gradient(135deg, rgba(15,23,42,0.92), rgba(76,29,149,0.85)), url(${BANNER_URL})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          >
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-4 bg-white/10 rounded-3xl px-5 py-3 w-full lg:w-auto">
+                <img
+                  src={LOGO_URL}
+                  alt="Calvary Bible Church logo"
+                  className="w-14 h-14 rounded-2xl border border-white/30 bg-white/10 object-contain p-2"
+                />
+                <div className="text-left">
+                  <p className="text-xs uppercase tracking-[0.35em] text-amber-200">
+                    {EVENT_DETAILS.host}
+                  </p>
+                  <p className="text-sm font-semibold text-white">
+                    VIP Entry Credential
+                  </p>
+                </div>
+              </div>
+              <div className="text-right w-full lg:w-auto">
+                <p className="text-xs uppercase tracking-[0.35em] text-orange-200">
+                  VIP ACCESS
+                </p>
+                <h2 className="text-4xl font-black mt-2 break-words">
+                  {guest.fullName}
+                </h2>
+                <p className="text-lg text-slate-100 mt-3">
+                  {guestTypeLabel} · Code: {guest.token}
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="px-10 py-8 space-y-8">
