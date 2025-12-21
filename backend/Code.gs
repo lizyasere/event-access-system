@@ -34,9 +34,10 @@ const CONFIG = {
   EVENT_HOST: "Calvary Bible Church",
   EVENT_DATE: "December 28, 2025 · 4:00 PM",
   EVENT_GATE_TIME: "Gate opens by 3:30 PM",
-  EVENT_VENUE: "Plot A3C, Ikosi Road, Oregun, Ikeja, Lagos",
+  EVENT_VENUE: "Rehoboth Multi-Purpose Hall, Calvary Bus Stop, Ikotun, 257 Ikotun - Idimu Rd, Ikotun, Lagos",
   EVENT_LOGO_URL: "https://cbcis30-invite.netlify.app/branding/cbc-logo.png",
   EVENT_BANNER_URL: "https://cbcis30-invite.netlify.app/branding/vip-banner.svg"
+
 };
 
 // ============================================================================
@@ -59,7 +60,7 @@ function onOpen() {
  */
 function setupSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  
+
   // Guests Sheet
   let guestSheet = ss.getSheetByName(SHEET_NAMES.GUESTS);
   if (!guestSheet) {
@@ -72,7 +73,7 @@ function setupSheets() {
     guestSheet.getRange("A1:O1").setFontWeight("bold").setBackground("#FF6B35");
     guestSheet.setFrozenRows(1);
   }
-  
+
   // Check-Ins Sheet
   let checkInSheet = ss.getSheetByName(SHEET_NAMES.CHECK_INS);
   if (!checkInSheet) {
@@ -83,7 +84,7 @@ function setupSheets() {
     checkInSheet.getRange("A1:F1").setFontWeight("bold").setBackground("#FF6B35");
     checkInSheet.setFrozenRows(1);
   }
-  
+
   SpreadsheetApp.getUi().alert("Sheets setup complete!");
 }
 
@@ -163,14 +164,14 @@ function registerGuests(data) {
     const associates = data.associates || [];
     const registrationDate = new Date().toISOString();
     const mainGuestId = generateGuestId("VIP");
-    
+
     const guests = [];
-    
+
     // Register main VIP guest
     const vipToken = generateToken();
     const vipFullName = `${mainGuest.title} ${mainGuest.firstName} ${mainGuest.surname}`;
     const vipZone = assignSeatingZone("VIP");
-    
+
     guestSheet.appendRow([
       mainGuestId,
       vipToken,
@@ -188,7 +189,7 @@ function registerGuests(data) {
       registrationDate,
       mainGuestId
     ]);
-    
+
     guests.push({
       id: mainGuestId,
       token: vipToken,
@@ -199,14 +200,14 @@ function registerGuests(data) {
         checkInUrl: `${CONFIG.BASE_URL}/checkin/${vipToken}`
       }
     });
-    
+
     // Register spouse if applicable
     if (mainGuest.withSpouse) {
       const spouseToken = generateToken();
       const spouseTitle = mainGuest.title === "Mr." ? "Mrs." : "Mr.";
       const spouseName = `${spouseTitle} ${mainGuest.surname} (Spouse)`;
       const spouseZone = assignSeatingZone("SPOUSE");
-      
+
       const spouseId = generateGuestId("SPOUSE");
       guestSheet.appendRow([
         spouseId,
@@ -225,7 +226,7 @@ function registerGuests(data) {
         registrationDate,
         mainGuestId
       ]);
-      
+
       guests.push({
         id: spouseId,
         token: spouseToken,
@@ -237,7 +238,7 @@ function registerGuests(data) {
         }
       });
     }
-    
+
     // Register associates
     associates.forEach((assoc, index) => {
       const assocToken = generateToken();
@@ -245,8 +246,10 @@ function registerGuests(data) {
       const assocName = `${assoc.title} ${assoc.firstName} ${assoc.surname}`;
       const assocZone = assignSeatingZone(assocType);
       const assocId = generateGuestId(assocType);
-      
+
+
       const associateEmail = assoc.email && assoc.email.length > 0 ? assoc.email : mainGuest.email;
+
       guestSheet.appendRow([
         assocId,
         assocToken,
@@ -256,6 +259,7 @@ function registerGuests(data) {
         assoc.surname,
         assocName,
         assoc.phone,
+        // mainGuest.email, // Use main guest's email
         associateEmail,
         mainGuest.churchName,
         assocType === "PA" ? "Personal Assistant" : "Associate",
@@ -264,7 +268,7 @@ function registerGuests(data) {
         registrationDate,
         mainGuestId
       ]);
-      
+
       guests.push({
         id: assocId,
         token: assocToken,
@@ -276,18 +280,18 @@ function registerGuests(data) {
         }
       });
     });
-    
+
     // Send email with QR codes
     if (CONFIG.EMAIL_ENABLED) {
       sendQRCodesEmail(mainGuest.email, vipFullName, guests);
     }
-    
+
     return {
       success: true,
       message: "Registration successful",
       guests: guests
     };
-    
+
   } catch (error) {
     Logger.log("Registration error: " + error.toString());
     return {
@@ -309,12 +313,12 @@ function checkInGuest(token, day, scannerName) {
   try {
     const guestSheet = getOrCreateSheet(SHEET_NAMES.GUESTS);
     const checkInSheet = getOrCreateSheet(SHEET_NAMES.CHECK_INS);
-    
+
     // Find guest by token
     const guestData = guestSheet.getDataRange().getValues();
     let guestRow = null;
     let guestIndex = -1;
-    
+
     for (let i = 1; i < guestData.length; i++) {
       if (guestData[i][1] === token) { // Column B is Token
         guestRow = guestData[i];
@@ -322,7 +326,7 @@ function checkInGuest(token, day, scannerName) {
         break;
       }
     }
-    
+
     if (!guestRow) {
       return {
         success: false,
@@ -331,13 +335,13 @@ function checkInGuest(token, day, scannerName) {
         alreadyCheckedIn: false
       };
     }
-    
+
     // Check if already checked in for this day
     const checkInData = checkInSheet.getDataRange().getValues();
     for (let i = 1; i < checkInData.length; i++) {
       if (checkInData[i][1] === guestRow[0] && checkInData[i][3] === day) {
         // Already checked in
-        const guest = buildGuestObject(guestRow, checkInData, guestData);
+        const guest = buildGuestObject(guestRow, checkInData);
         return {
           success: false,
           message: `Guest already checked in for ${day}`,
@@ -346,7 +350,7 @@ function checkInGuest(token, day, scannerName) {
         };
       }
     }
-    
+
     // Record check-in
     const checkInId = `CHK-${Date.now()}`;
     const timestamp = new Date().toISOString();
@@ -358,16 +362,16 @@ function checkInGuest(token, day, scannerName) {
       timestamp,
       scannerName || "Unknown"
     ]);
-    
-    const guest = buildGuestObject(guestRow, checkInData, guestData);
-    
+
+    const guest = buildGuestObject(guestRow, checkInSheet.getDataRange().getValues());
+
     return {
       success: true,
       message: "Check-in successful",
       guest: guest,
       alreadyCheckedIn: false
     };
-    
+
   } catch (error) {
     Logger.log("Check-in error: " + error.toString());
     return {
@@ -384,7 +388,7 @@ function checkInGuest(token, day, scannerName) {
  */
 function buildGuestObject(guestRow, checkInData, guestSheetData) {
   const checkIns = [];
-  
+
   // Get all check-ins for this guest
   for (let i = 1; i < checkInData.length; i++) {
     if (checkInData[i][1] === guestRow[0]) {
@@ -396,6 +400,7 @@ function buildGuestObject(guestRow, checkInData, guestSheetData) {
     }
   }
 
+  
   const mainGuestId = guestRow[14] || guestRow[0];
   let hostName = guestRow[6];
   let hostPhone = guestRow[7];
@@ -411,7 +416,8 @@ function buildGuestObject(guestRow, checkInData, guestSheetData) {
       }
     }
   }
-  
+
+
   return {
     id: guestRow[0],
     token: guestRow[1],
@@ -427,10 +433,10 @@ function buildGuestObject(guestRow, checkInData, guestSheetData) {
     withCar: guestRow[11],
     zone: guestRow[12],
     registrationDate: guestRow[13],
-    mainGuestId: mainGuestId,
-    hostName: hostName,
-    hostPhone: hostPhone,
-    hostEmail: hostEmail,
+     mainGuestId: mainGuestId,
+      hostName: hostName,
+      hostPhone: hostPhone,
+      hostEmail: hostEmail,
     checkIns: checkIns
   };
 }
@@ -442,16 +448,17 @@ function getGuestByToken(token) {
   try {
     const guestSheet = getOrCreateSheet(SHEET_NAMES.GUESTS);
     const checkInSheet = getOrCreateSheet(SHEET_NAMES.CHECK_INS);
-    
+
     const guestData = guestSheet.getDataRange().getValues();
-    const checkInData = checkInSheet.getDataRange().getValues();
-    
+     const checkInData = checkInSheet.getDataRange().getValues();
+
     for (let i = 1; i < guestData.length; i++) {
       if (guestData[i][1] === token) {
-        return buildGuestObject(guestData[i], checkInData, guestData);
+         return buildGuestObject(guestData[i], checkInData, guestData);
+        // return buildGuestObject(guestData[i], checkInSheet.getDataRange().getValues());
       }
     }
-    
+
     return null;
   } catch (error) {
     Logger.log("Get guest error: " + error.toString());
@@ -473,11 +480,18 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
     const passCards = guests.map(guest => {
       const passUrl = `${CONFIG.BASE_URL}/pass/${guest.token}`;
       const qrUrl = `https://chart.googleapis.com/chart?chs=420x420&cht=qr&chl=${encodeURIComponent(guest.qrData.checkInUrl)}&choe=UTF-8`;
-      const guestType = guest.type === "VIP" ? "VIP Guest" : guest.type === "SPOUSE" ? "Spouse" : guest.type === "PA" ? "Personal Assistant" : "Associate";
+      const guestType =
+        guest.type === "VIP"
+          ? "VIP Guest"
+          : guest.type === "SPOUSE"
+            ? "Spouse"
+            : guest.type === "PA"
+              ? "Personal Assistant"
+              : "Associate";
 
       return `
         <div class="pass-card">
-          <img class="pass-logo" src="${CONFIG.EVENT_LOGO_URL}" alt="${CONFIG.EVENT_HOST} logo" />
+                  <img class="pass-logo" src="${CONFIG.EVENT_LOGO_URL}" alt="${CONFIG.EVENT_HOST} logo" />
           <div class="pass-chip">${guestType}</div>
           <h3>${guest.name}</h3>
           <div class="pass-meta">
@@ -501,7 +515,7 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
         <style>
           body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; color: #1f2937; }
           .wrapper { max-width: 640px; margin: 0 auto; padding: 32px 20px; }
-          .hero { position: relative; border-radius: 28px; overflow: hidden; text-align: center; }
+            .hero { position: relative; border-radius: 28px; overflow: hidden; text-align: center; }
           .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(15,23,42,0.92), rgba(76,29,149,0.85)); }
           .hero-overlay { position: relative; padding: 40px 32px; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 16px; }
           .hero-logo { width: 86px; height: 86px; border-radius: 24px; background: rgba(255,255,255,0.08); padding: 12px; object-fit: contain; border: 1px solid rgba(255,255,255,0.2); }
@@ -589,7 +603,7 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
 function testEmail() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('Test Email', 'Enter email address:', ui.ButtonSet.OK_CANCEL);
-  
+
   if (response.getSelectedButton() == ui.Button.OK) {
     const email = response.getResponseText();
     const testGuests = [{
@@ -602,7 +616,7 @@ function testEmail() {
         checkInUrl: `${CONFIG.BASE_URL}/checkin/TOK-test-123`
       }
     }];
-    
+
     sendQRCodesEmail(email, "Test Guest", testGuests);
     ui.alert('Test email sent to ' + email);
   }
@@ -618,14 +632,14 @@ function testEmail() {
 function doGet(e) {
   const action = e.parameter.action;
   const token = e.parameter.token;
-  
+
   if (action === "getGuest" && token) {
     const guest = getGuestByToken(token);
     return ContentService
       .createTextOutput(JSON.stringify(guest))
       .setMimeType(ContentService.MimeType.JSON);
   }
-  
+
   return ContentService
     .createTextOutput(JSON.stringify({ error: "Invalid request" }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -638,9 +652,9 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     const action = data.action;
-    
+
     let response;
-    
+
     if (action === "register") {
       response = registerGuests(data.data);
     } else if (action === "checkIn") {
@@ -648,11 +662,11 @@ function doPost(e) {
     } else {
       response = { success: false, message: "Invalid action" };
     }
-    
+
     return ContentService
       .createTextOutput(JSON.stringify(response))
       .setMimeType(ContentService.MimeType.JSON);
-      
+
   } catch (error) {
     Logger.log("doPost error: " + error.toString());
     return ContentService
@@ -674,13 +688,13 @@ function doPost(e) {
 function exportGuests() {
   const guestSheet = getOrCreateSheet(SHEET_NAMES.GUESTS);
   const data = guestSheet.getDataRange().getValues();
-  
+
   // Create CSV content
   let csv = data.map(row => row.join(",")).join("\n");
-  
+
   // Create blob and download
   const blob = Utilities.newBlob(csv, "text/csv", "guests_export.csv");
   DriveApp.createFile(blob);
-  
+
   SpreadsheetApp.getUi().alert("Guests exported to your Google Drive as 'guests_export.csv'");
 }
