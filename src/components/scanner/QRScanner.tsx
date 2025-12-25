@@ -40,14 +40,9 @@ export const QRScanner: React.FC = () => {
 
         setCheckInResult(result);
         setScannedGuest(result.guest || null);
-
-        setTimeout(() => {
-          resetScanner();
-        }, 5000);
       } catch (err) {
         setError("Failed to process check-in. Please try again.");
         console.error(err);
-        setTimeout(() => resetScanner(), 3000);
       }
     },
     [selectedDay, scannerName]
@@ -140,6 +135,7 @@ export const QRScanner: React.FC = () => {
     setScannedGuest(null);
     setCheckInResult(null);
     setError(null);
+    setCameraError(null);
     if (cameraRef.current && isScanning) {
       cameraRef.current.resume();
     }
@@ -169,7 +165,14 @@ export const QRScanner: React.FC = () => {
   const stopScanning = () => {
     setIsScanning(false);
     setSelectedCameraId(null);
+    setScannedGuest(null);
+    setCheckInResult(null);
+    setError(null);
+    setCameraError(null);
   };
+
+  const guestToShow = checkInResult?.guest ?? scannedGuest;
+  const shouldShowScannerViewport = isScanning && !checkInResult;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50 p-4 py-12">
@@ -242,7 +245,7 @@ export const QRScanner: React.FC = () => {
         ) : (
           <>
             {/* QR Scanner Display */}
-            {!scannedGuest && (
+            {shouldShowScannerViewport && (
               <div className="bg-white p-8 shadow-xl border-x border-gray-100">
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-4 p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl border border-orange-200">
@@ -301,7 +304,7 @@ export const QRScanner: React.FC = () => {
             )}
 
             {/* Check-In Result */}
-            {checkInResult && scannedGuest && (
+            {checkInResult && (
               <div className="bg-white rounded-b-3xl shadow-xl overflow-hidden border border-gray-100">
                 {/* Success/Error Banner */}
                 {checkInResult.success ? (
@@ -327,22 +330,36 @@ export const QRScanner: React.FC = () => {
                 )}
 
                 {/* Guest Details */}
-                <GuestDetails guest={scannedGuest} day={selectedDay} />
+                {guestToShow ? (
+                  <GuestDetails guest={guestToShow} day={selectedDay} />
+                ) : (
+                  <div className="p-10 text-center text-gray-700 text-lg font-semibold">
+                    {checkInResult.message || "No guest information returned."}
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="p-8 bg-gradient-to-br from-gray-50 to-orange-50">
-                  <button
-                    onClick={resetScanner}
-                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-[1.02] transition-all"
-                  >
-                    Scan Next Guest
-                  </button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                      onClick={resetScanner}
+                      className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-[1.02] transition-all"
+                    >
+                      Scan Next Guest
+                    </button>
+                    <button
+                      onClick={stopScanning}
+                      className="w-full bg-white border-2 border-gray-200 text-gray-800 py-5 rounded-xl font-bold text-lg hover:border-gray-300 transition-all"
+                    >
+                      End Scanning Session
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Error Display */}
-            {error && !scannedGuest && (
+            {error && !checkInResult && (
               <div className="bg-white p-8 rounded-b-3xl shadow-xl border border-gray-100">
                 <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 flex items-start gap-4">
                   <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />

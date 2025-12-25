@@ -24,6 +24,7 @@ export const GuestPass: React.FC = () => {
   const [guest, setGuest] = useState<GuestData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [autoPrintRequested, setAutoPrintRequested] = useState(false);
 
   useEffect(() => {
     const styleId = "guest-pass-print-style";
@@ -34,10 +35,26 @@ export const GuestPass: React.FC = () => {
     style.id = styleId;
     style.innerHTML = `
       @media print {
-        body { background: #fff !important; }
+        body {
+          background: #fff !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
         body * { visibility: hidden; }
-        #guest-pass-print-root, #guest-pass-print-root * { visibility: visible; }
-        #guest-pass-print-root { position: absolute; inset: 0; margin: 0 !important; width: 100%; }
+        #guest-pass-print-root,
+        #guest-pass-print-root * {
+          visibility: visible;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        #guest-pass-print-root {
+          position: absolute;
+          inset: 0;
+          margin: 0 !important;
+          width: 100%;
+          background: #fff;
+        }
       }
     `;
     document.head.appendChild(style);
@@ -48,6 +65,28 @@ export const GuestPass: React.FC = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("print") === "1") {
+      setAutoPrintRequested(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!autoPrintRequested || isLoading || !guest) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      window.print();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [autoPrintRequested, isLoading, guest]);
 
   useEffect(() => {
     if (!token) {

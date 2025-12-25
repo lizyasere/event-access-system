@@ -1,7 +1,7 @@
 /**
  * Google Apps Script Backend for Event Access System
  * 30th Anniversary Celebration - QR Code Check-In System
- * 
+ *
  * SETUP INSTRUCTIONS:
  * 1. Create a new Google Sheets document
  * 2. Name it "Event Access System - 30th Anniversary"
@@ -24,7 +24,7 @@
 const SHEET_NAMES = {
   GUESTS: "Guests",
   CHECK_INS: "CheckIns",
-  CONFIG: "Config"
+  CONFIG: "Config",
 };
 
 const CONFIG = {
@@ -34,11 +34,95 @@ const CONFIG = {
   EVENT_HOST: "Calvary Bible Church",
   EVENT_DATE: "December 28, 2025 · 4:00 PM",
   EVENT_GATE_TIME: "Gate opens by 3:30 PM",
-  EVENT_VENUE: "Rehoboth Multi-Purpose Hall, Calvary Bus Stop, Ikotun, 257 Ikotun - Idimu Rd, Ikotun, Lagos",
+  EVENT_VENUE:
+    "Rehoboth Multi-Purpose Hall, Calvary Bus Stop, Ikotun, 257 Ikotun - Idimu Rd, Ikotun, Lagos",
   EVENT_LOGO_URL: "https://cbcis30-invite.netlify.app/branding/cbc-logo.png",
-  EVENT_BANNER_URL: "https://cbcis30-invite.netlify.app/branding/vip-banner.svg"
-
+  EVENT_BANNER_URL:
+    "https://cbcis30-invite.netlify.app/branding/vip-banner.svg",
+  MAILERLITE_ENABLED: false,
+  MAILERLITE_API_KEY:
+    PropertiesService.getScriptProperties().getProperty("...") || "",
+  MAILERLITE_API_URL:
+    "https://connect.mailerlite.com/api/transactional/messages",
+  MAILERLITE_SENDER_EMAIL:
+    PropertiesService.getScriptProperties().getProperty("...") || "",
+  MAILERLITE_SENDER_NAME: Calvary Bible Church,
 };
+
+/**
+ * Build a base64 data URI for QR images so they render inline inside emails
+ */
+function buildQrCodeDataUri(checkInUrl) {
+  try {
+    const qrUrl = `https://chart.googleapis.com/chart?chs=420x420&cht=qr&chl=${encodeURIComponent(
+      checkInUrl
+    )}&choe=UTF-8`;
+    const response = UrlFetchApp.fetch(qrUrl, { muteHttpExceptions: true });
+
+    if (response.getResponseCode() >= 400) {
+      Logger.log(
+        `QR fetch failed (${response.getResponseCode()}): ${response.getContentText()}`
+      );
+      return null;
+    }
+
+    const base64 = Utilities.base64Encode(response.getBlob().getBytes());
+    return `data:image/png;base64,${base64}`;
+  } catch (error) {
+    Logger.log(`QR data URI error: ${error.toString()}`);
+    return null;
+  }
+}
+
+/**
+ * Send event emails through MailerLite's transactional endpoint when enabled
+ */
+function sendEmailViaMailerLite(toEmail, subject, htmlBody, recipientName) {
+  if (!CONFIG.MAILERLITE_API_KEY || !CONFIG.MAILERLITE_SENDER_EMAIL) {
+    throw new Error(
+      "MailerLite is enabled but API key or sender email is missing"
+    );
+  }
+
+  const payload = {
+    subject: subject,
+    from: {
+      email: CONFIG.MAILERLITE_SENDER_EMAIL,
+      name: CONFIG.MAILERLITE_SENDER_NAME || CONFIG.EVENT_HOST,
+    },
+    to: [
+      {
+        email: toEmail,
+        name: recipientName || toEmail,
+      },
+    ],
+    content: [
+      {
+        type: "text/html",
+        value: htmlBody,
+      },
+    ],
+  };
+
+  const response = UrlFetchApp.fetch(CONFIG.MAILERLITE_API_URL, {
+    method: "post",
+    contentType: "application/json",
+    headers: {
+      Authorization: `Bearer ${CONFIG.MAILERLITE_API_KEY}`,
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true,
+  });
+
+  const statusCode = response.getResponseCode();
+  if (statusCode >= 400) {
+    throw new Error(
+      `MailerLite API error (${statusCode}): ${response.getContentText()}`
+    );
+  }
+
+  return true;
+}
 
 // ============================================================================
 // INITIALIZATION
@@ -46,11 +130,11 @@ const CONFIG = {
 
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('Event System')
-    .addItem('Setup Sheets', 'setupSheets')
-    .addItem('Test Email', 'testEmail')
+  ui.createMenu("Event System")
+    .addItem("Setup Sheets", "setupSheets")
+    .addItem("Test Email", "testEmail")
     .addSeparator()
-    .addItem('Export Guests', 'exportGuests')
+    .addItem("Export Guests", "exportGuests")
     .addToUi();
 }
 
@@ -65,11 +149,27 @@ function setupSheets() {
   let guestSheet = ss.getSheetByName(SHEET_NAMES.GUESTS);
   if (!guestSheet) {
     guestSheet = ss.insertSheet(SHEET_NAMES.GUESTS);
-    guestSheet.getRange("A1:O1").setValues([[
-      "ID", "Token", "Type", "Title", "First Name", "Surname", "Full Name",
-      "Phone", "Email", "Church Name", "Position", "With Car", "Zone",
-      "Registration Date", "Main Guest ID"
-    ]]);
+    guestSheet
+      .getRange("A1:O1")
+      .setValues([
+        [
+          "ID",
+          "Token",
+          "Type",
+          "Title",
+          "First Name",
+          "Surname",
+          "Full Name",
+          "Phone",
+          "Email",
+          "Church Name",
+          "Position",
+          "With Car",
+          "Zone",
+          "Registration Date",
+          "Main Guest ID",
+        ],
+      ]);
     guestSheet.getRange("A1:O1").setFontWeight("bold").setBackground("#FF6B35");
     guestSheet.setFrozenRows(1);
   }
@@ -78,10 +178,22 @@ function setupSheets() {
   let checkInSheet = ss.getSheetByName(SHEET_NAMES.CHECK_INS);
   if (!checkInSheet) {
     checkInSheet = ss.insertSheet(SHEET_NAMES.CHECK_INS);
-    checkInSheet.getRange("A1:F1").setValues([[
-      "Check-In ID", "Guest ID", "Guest Name", "Day", "Timestamp", "Scanner Name"
-    ]]);
-    checkInSheet.getRange("A1:F1").setFontWeight("bold").setBackground("#FF6B35");
+    checkInSheet
+      .getRange("A1:F1")
+      .setValues([
+        [
+          "Check-In ID",
+          "Guest ID",
+          "Guest Name",
+          "Day",
+          "Timestamp",
+          "Scanner Name",
+        ],
+      ]);
+    checkInSheet
+      .getRange("A1:F1")
+      .setFontWeight("bold")
+      .setBackground("#FF6B35");
     checkInSheet.setFrozenRows(1);
   }
 
@@ -187,7 +299,7 @@ function registerGuests(data) {
       mainGuest.withCar,
       vipZone,
       registrationDate,
-      mainGuestId
+      mainGuestId,
     ]);
 
     guests.push({
@@ -197,8 +309,8 @@ function registerGuests(data) {
       type: "VIP",
       qrData: {
         token: vipToken,
-        checkInUrl: `${CONFIG.BASE_URL}/checkin/${vipToken}`
-      }
+        checkInUrl: `${CONFIG.BASE_URL}/checkin/${vipToken}`,
+      },
     });
 
     // Register spouse if applicable
@@ -224,7 +336,7 @@ function registerGuests(data) {
         mainGuest.withCar,
         spouseZone,
         registrationDate,
-        mainGuestId
+        mainGuestId,
       ]);
 
       guests.push({
@@ -234,21 +346,22 @@ function registerGuests(data) {
         type: "SPOUSE",
         qrData: {
           token: spouseToken,
-          checkInUrl: `${CONFIG.BASE_URL}/checkin/${spouseToken}`
-        }
+          checkInUrl: `${CONFIG.BASE_URL}/checkin/${spouseToken}`,
+        },
       });
     }
 
     // Register associates
     associates.forEach((assoc, index) => {
       const assocToken = generateToken();
-      const assocType = index === 0 && associates.length > 1 ? "PA" : "ASSOCIATE";
+      const assocType =
+        index === 0 && associates.length > 1 ? "PA" : "ASSOCIATE";
       const assocName = `${assoc.title} ${assoc.firstName} ${assoc.surname}`;
       const assocZone = assignSeatingZone(assocType);
       const assocId = generateGuestId(assocType);
 
-
-      const associateEmail = assoc.email && assoc.email.length > 0 ? assoc.email : mainGuest.email;
+      const associateEmail =
+        assoc.email && assoc.email.length > 0 ? assoc.email : mainGuest.email;
 
       guestSheet.appendRow([
         assocId,
@@ -266,7 +379,7 @@ function registerGuests(data) {
         assoc.withCar,
         assocZone,
         registrationDate,
-        mainGuestId
+        mainGuestId,
       ]);
 
       guests.push({
@@ -276,8 +389,8 @@ function registerGuests(data) {
         type: assocType,
         qrData: {
           token: assocToken,
-          checkInUrl: `${CONFIG.BASE_URL}/checkin/${assocToken}`
-        }
+          checkInUrl: `${CONFIG.BASE_URL}/checkin/${assocToken}`,
+        },
       });
     });
 
@@ -289,15 +402,14 @@ function registerGuests(data) {
     return {
       success: true,
       message: "Registration successful",
-      guests: guests
+      guests: guests,
     };
-
   } catch (error) {
     Logger.log("Registration error: " + error.toString());
     return {
       success: false,
       message: "Registration failed: " + error.toString(),
-      guests: []
+      guests: [],
     };
   }
 }
@@ -320,7 +432,8 @@ function checkInGuest(token, day, scannerName) {
     let guestIndex = -1;
 
     for (let i = 1; i < guestData.length; i++) {
-      if (guestData[i][1] === token) { // Column B is Token
+      if (guestData[i][1] === token) {
+        // Column B is Token
         guestRow = guestData[i];
         guestIndex = i + 1;
         break;
@@ -332,7 +445,7 @@ function checkInGuest(token, day, scannerName) {
         success: false,
         message: "Invalid QR code. Guest not found.",
         guest: null,
-        alreadyCheckedIn: false
+        alreadyCheckedIn: false,
       };
     }
 
@@ -346,7 +459,7 @@ function checkInGuest(token, day, scannerName) {
           success: false,
           message: `Guest already checked in for ${day}`,
           guest: guest,
-          alreadyCheckedIn: true
+          alreadyCheckedIn: true,
         };
       }
     }
@@ -360,25 +473,27 @@ function checkInGuest(token, day, scannerName) {
       guestRow[6], // Full Name
       day,
       timestamp,
-      scannerName || "Unknown"
+      scannerName || "Unknown",
     ]);
 
-    const guest = buildGuestObject(guestRow, checkInSheet.getDataRange().getValues());
+    const guest = buildGuestObject(
+      guestRow,
+      checkInSheet.getDataRange().getValues()
+    );
 
     return {
       success: true,
       message: "Check-in successful",
       guest: guest,
-      alreadyCheckedIn: false
+      alreadyCheckedIn: false,
     };
-
   } catch (error) {
     Logger.log("Check-in error: " + error.toString());
     return {
       success: false,
       message: "Check-in failed: " + error.toString(),
       guest: null,
-      alreadyCheckedIn: false
+      alreadyCheckedIn: false,
     };
   }
 }
@@ -395,12 +510,11 @@ function buildGuestObject(guestRow, checkInData, guestSheetData) {
       checkIns.push({
         day: checkInData[i][3],
         timestamp: checkInData[i][4],
-        scannerName: checkInData[i][5]
+        scannerName: checkInData[i][5],
       });
     }
   }
 
-  
   const mainGuestId = guestRow[14] || guestRow[0];
   let hostName = guestRow[6];
   let hostPhone = guestRow[7];
@@ -417,7 +531,6 @@ function buildGuestObject(guestRow, checkInData, guestSheetData) {
     }
   }
 
-
   return {
     id: guestRow[0],
     token: guestRow[1],
@@ -433,11 +546,11 @@ function buildGuestObject(guestRow, checkInData, guestSheetData) {
     withCar: guestRow[11],
     zone: guestRow[12],
     registrationDate: guestRow[13],
-     mainGuestId: mainGuestId,
-      hostName: hostName,
-      hostPhone: hostPhone,
-      hostEmail: hostEmail,
-    checkIns: checkIns
+    mainGuestId: mainGuestId,
+    hostName: hostName,
+    hostPhone: hostPhone,
+    hostEmail: hostEmail,
+    checkIns: checkIns,
   };
 }
 
@@ -450,11 +563,11 @@ function getGuestByToken(token) {
     const checkInSheet = getOrCreateSheet(SHEET_NAMES.CHECK_INS);
 
     const guestData = guestSheet.getDataRange().getValues();
-     const checkInData = checkInSheet.getDataRange().getValues();
+    const checkInData = checkInSheet.getDataRange().getValues();
 
     for (let i = 1; i < guestData.length; i++) {
       if (guestData[i][1] === token) {
-         return buildGuestObject(guestData[i], checkInData, guestData);
+        return buildGuestObject(guestData[i], checkInData, guestData);
         // return buildGuestObject(guestData[i], checkInSheet.getDataRange().getValues());
       }
     }
@@ -477,19 +590,24 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
   try {
     const subject = "VIP Guest Logistics Guide - Calvary Bible Church";
 
-    const passCards = guests.map(guest => {
-      const passUrl = `${CONFIG.BASE_URL}/pass/${guest.token}`;
-      const qrUrl = `https://chart.googleapis.com/chart?chs=420x420&cht=qr&chl=${encodeURIComponent(guest.qrData.checkInUrl)}&choe=UTF-8`;
-      const guestType =
-        guest.type === "VIP"
-          ? "VIP Guest"
-          : guest.type === "SPOUSE"
+    const passCards = guests
+      .map((guest) => {
+        const passUrl = `${CONFIG.BASE_URL}/pass/${guest.token}`;
+        const qrInline = buildQrCodeDataUri(guest.qrData.checkInUrl);
+        const qrUrl = `https://chart.googleapis.com/chart?chs=420x420&cht=qr&chl=${encodeURIComponent(
+          guest.qrData.checkInUrl
+        )}&choe=UTF-8`;
+        const qrImageSrc = qrInline || qrUrl;
+        const guestType =
+          guest.type === "VIP"
+            ? "VIP Guest"
+            : guest.type === "SPOUSE"
             ? "Spouse"
             : guest.type === "PA"
-              ? "Personal Assistant"
-              : "Associate";
+            ? "Personal Assistant"
+            : "Associate";
 
-      return `
+        return `
         <div class="pass-card">
                   <img class="pass-logo" src="${CONFIG.EVENT_LOGO_URL}" alt="${CONFIG.EVENT_HOST} logo" />
           <div class="pass-chip">${guestType}</div>
@@ -500,12 +618,13 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
             <p>${CONFIG.EVENT_VENUE}</p>
           </div>
           <div class="pass-qr">
-            <img src="${qrUrl}" alt="QR code for ${guest.name}" />
+            <img src="${qrImageSrc}" alt="QR code for ${guest.name}" />
           </div>
           <a href="${passUrl}" class="pass-link">View & Download Full Pass</a>
         </div>
       `;
-    }).join("\n");
+      })
+      .join("\n");
 
     const htmlBody = `
       <!DOCTYPE html>
@@ -582,15 +701,26 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
       </html>
     `;
 
+    if (CONFIG.MAILERLITE_ENABLED) {
+      try {
+        sendEmailViaMailerLite(email, subject, htmlBody, mainGuestName);
+        Logger.log(`Email sent via MailerLite to ${email}`);
+        return true;
+      } catch (mailerLiteError) {
+        Logger.log(
+          `MailerLite send error: ${mailerLiteError.toString()}. Falling back to MailApp.`
+        );
+      }
+    }
+
     MailApp.sendEmail({
       to: email,
       subject: subject,
-      htmlBody: htmlBody
+      htmlBody: htmlBody,
     });
 
     Logger.log(`Email sent successfully to ${email}`);
     return true;
-
   } catch (error) {
     Logger.log(`Email send error: ${error.toString()}`);
     return false;
@@ -602,23 +732,29 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
  */
 function testEmail() {
   const ui = SpreadsheetApp.getUi();
-  const response = ui.prompt('Test Email', 'Enter email address:', ui.ButtonSet.OK_CANCEL);
+  const response = ui.prompt(
+    "Test Email",
+    "Enter email address:",
+    ui.ButtonSet.OK_CANCEL
+  );
 
   if (response.getSelectedButton() == ui.Button.OK) {
     const email = response.getResponseText();
-    const testGuests = [{
-      id: "TEST-001",
-      token: "TOK-test-123",
-      name: "Test Guest",
-      type: "VIP",
-      qrData: {
+    const testGuests = [
+      {
+        id: "TEST-001",
         token: "TOK-test-123",
-        checkInUrl: `${CONFIG.BASE_URL}/checkin/TOK-test-123`
-      }
-    }];
+        name: "Test Guest",
+        type: "VIP",
+        qrData: {
+          token: "TOK-test-123",
+          checkInUrl: `${CONFIG.BASE_URL}/checkin/TOK-test-123`,
+        },
+      },
+    ];
 
     sendQRCodesEmail(email, "Test Guest", testGuests);
-    ui.alert('Test email sent to ' + email);
+    ui.alert("Test email sent to " + email);
   }
 }
 
@@ -635,14 +771,14 @@ function doGet(e) {
 
   if (action === "getGuest" && token) {
     const guest = getGuestByToken(token);
-    return ContentService
-      .createTextOutput(JSON.stringify(guest))
-      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify(guest)).setMimeType(
+      ContentService.MimeType.JSON
+    );
   }
 
-  return ContentService
-    .createTextOutput(JSON.stringify({ error: "Invalid request" }))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(
+    JSON.stringify({ error: "Invalid request" })
+  ).setMimeType(ContentService.MimeType.JSON);
 }
 
 /**
@@ -663,18 +799,17 @@ function doPost(e) {
       response = { success: false, message: "Invalid action" };
     }
 
-    return ContentService
-      .createTextOutput(JSON.stringify(response))
-      .setMimeType(ContentService.MimeType.JSON);
-
+    return ContentService.createTextOutput(
+      JSON.stringify(response)
+    ).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     Logger.log("doPost error: " + error.toString());
-    return ContentService
-      .createTextOutput(JSON.stringify({
+    return ContentService.createTextOutput(
+      JSON.stringify({
         success: false,
-        message: "Server error: " + error.toString()
-      }))
-      .setMimeType(ContentService.MimeType.JSON);
+        message: "Server error: " + error.toString(),
+      })
+    ).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
@@ -690,11 +825,13 @@ function exportGuests() {
   const data = guestSheet.getDataRange().getValues();
 
   // Create CSV content
-  let csv = data.map(row => row.join(",")).join("\n");
+  let csv = data.map((row) => row.join(",")).join("\n");
 
   // Create blob and download
   const blob = Utilities.newBlob(csv, "text/csv", "guests_export.csv");
   DriveApp.createFile(blob);
 
-  SpreadsheetApp.getUi().alert("Guests exported to your Google Drive as 'guests_export.csv'");
+  SpreadsheetApp.getUi().alert(
+    "Guests exported to your Google Drive as 'guests_export.csv'"
+  );
 }

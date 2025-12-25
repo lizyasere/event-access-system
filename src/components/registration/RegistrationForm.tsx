@@ -17,7 +17,7 @@ export const RegistrationForm: React.FC = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [successData, setSuccessData] = useState<{
     mainGuestName: string;
-    qrCodes: { name: string; qrImage: string }[];
+    qrCodes: { name: string; qrImage: string; token: string }[];
   } | null>(null);
 
   const {
