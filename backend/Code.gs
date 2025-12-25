@@ -46,7 +46,7 @@ const CONFIG = {
     "https://connect.mailerlite.com/api/transactional/messages",
   MAILERLITE_SENDER_EMAIL:
     PropertiesService.getScriptProperties().getProperty("...") || "",
-  MAILERLITE_SENDER_NAME: Calvary Bible Church,
+  MAILERLITE_SENDER_NAME: "",
 };
 
 /**
