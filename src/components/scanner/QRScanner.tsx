@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Html5Qrcode, type CameraDevice } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { Camera, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { qrService } from "../../services/qr";
 import { apiService } from "../../services/api";
@@ -14,7 +14,6 @@ export const QRScanner: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>(API_CONFIG.EVENT_DAYS[0]);
   const [scannerName, setScannerName] = useState<string>("");
-  const [availableCameras, setAvailableCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraPreparing, setIsCameraPreparing] = useState(false);
@@ -72,7 +71,7 @@ export const QRScanner: React.FC = () => {
           setCameraError("No cameras detected on this device");
           return;
         }
-        setAvailableCameras(devices);
+        // Always prefer back camera, no user selection
         const preferred = devices.find((device) =>
           /back|rear|environment/i.test(device.label)
         );
@@ -151,15 +150,6 @@ export const QRScanner: React.FC = () => {
     setCameraError(null);
     setScannedGuest(null);
     setCheckInResult(null);
-  };
-
-  const handleCameraChange = (
-    event: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    setSelectedCameraId(event.target.value);
-    setScannedGuest(null);
-    setCheckInResult(null);
-    setError(null);
   };
 
   const stopScanning = () => {
@@ -257,27 +247,7 @@ export const QRScanner: React.FC = () => {
                     </span>
                   </div>
 
-                  {availableCameras.length > 1 && (
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">
-                        Camera Source
-                      </label>
-                      <select
-                        value={selectedCameraId ?? ""}
-                        onChange={handleCameraChange}
-                        className="px-4 py-3 rounded-xl border-2 border-gray-200 focus:ring-2 focus:ring-orange-500"
-                      >
-                        {availableCameras.map((camera) => (
-                          <option key={camera.id} value={camera.id}>
-                            {camera.label || "Camera"}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500">
-                        Defaults to the rear camera when available.
-                      </p>
-                    </div>
-                  )}
+
 
                   {isCameraPreparing && (
                     <div className="mt-4 text-sm text-gray-600">

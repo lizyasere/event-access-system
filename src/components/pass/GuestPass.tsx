@@ -270,7 +270,7 @@ export const GuestPass: React.FC = () => {
                 Logistics
               </p>
               <p className="text-orange-900 font-semibold mt-2">
-                Protocol and StarGuard teams will be on ground from 3:30 PM.
+                Protocol team will be on ground from 3:30 PM.
               </p>
             </div>
           </div>

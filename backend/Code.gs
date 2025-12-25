@@ -27,6 +27,17 @@ const SHEET_NAMES = {
   CONFIG: "Config",
 };
 
+// Read MailerLite settings from Script Properties
+function getMailerLiteConfig() {
+  const props = PropertiesService.getScriptProperties();
+  return {
+    enabled: (props.getProperty("MAILERLITE_ENABLED") || "false").toString().trim().toLowerCase() === "true",
+    apiKey: props.getProperty("MAILERLITE_API_KEY") || "",
+    senderEmail: props.getProperty("MAILERLITE_SENDER_EMAIL") || "",
+    senderName: props.getProperty("MAILERLITE_SENDER_NAME") || "Calvary Bible Church"
+  };
+}
+
 const CONFIG = {
   BASE_URL: "https://cbcis30-invite.netlify.app",
   EMAIL_ENABLED: true,
@@ -39,14 +50,8 @@ const CONFIG = {
   EVENT_LOGO_URL: "https://cbcis30-invite.netlify.app/branding/cbc-logo.png",
   EVENT_BANNER_URL:
     "https://cbcis30-invite.netlify.app/branding/vip-banner.svg",
-  MAILERLITE_ENABLED: false,
-  MAILERLITE_API_KEY:
-    PropertiesService.getScriptProperties().getProperty("...") || "",
   MAILERLITE_API_URL:
     "https://connect.mailerlite.com/api/transactional/messages",
-  MAILERLITE_SENDER_EMAIL:
-    PropertiesService.getScriptProperties().getProperty("...") || "",
-  MAILERLITE_SENDER_NAME: "",
 };
 
 /**
@@ -78,7 +83,9 @@ function buildQrCodeDataUri(checkInUrl) {
  * Send event emails through MailerLite's transactional endpoint when enabled
  */
 function sendEmailViaMailerLite(toEmail, subject, htmlBody, recipientName) {
-  if (!CONFIG.MAILERLITE_API_KEY || !CONFIG.MAILERLITE_SENDER_EMAIL) {
+  const mlConfig = getMailerLiteConfig();
+  
+  if (!mlConfig.apiKey || !mlConfig.senderEmail) {
     throw new Error(
       "MailerLite is enabled but API key or sender email is missing"
     );
@@ -87,8 +94,8 @@ function sendEmailViaMailerLite(toEmail, subject, htmlBody, recipientName) {
   const payload = {
     subject: subject,
     from: {
-      email: CONFIG.MAILERLITE_SENDER_EMAIL,
-      name: CONFIG.MAILERLITE_SENDER_NAME || CONFIG.EVENT_HOST,
+      email: mlConfig.senderEmail,
+      name: mlConfig.senderName || CONFIG.EVENT_HOST,
     },
     to: [
       {
@@ -108,7 +115,7 @@ function sendEmailViaMailerLite(toEmail, subject, htmlBody, recipientName) {
     method: "post",
     contentType: "application/json",
     headers: {
-      Authorization: `Bearer ${CONFIG.MAILERLITE_API_KEY}`,
+      Authorization: `Bearer ${mlConfig.apiKey}`,
     },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
@@ -584,20 +591,48 @@ function getGuestByToken(token) {
 // ============================================================================
 
 /**
- * Send QR codes via email
+ * Fetch QR code image as a blob for inline email attachment
+ */
+function fetchQrCodeBlob(checkInUrl) {
+  try {
+    const qrUrl = `https://chart.googleapis.com/chart?chs=420x420&cht=qr&chl=${encodeURIComponent(
+      checkInUrl
+    )}&choe=UTF-8`;
+    const response = UrlFetchApp.fetch(qrUrl, { muteHttpExceptions: true });
+    if (response.getResponseCode() >= 400) {
+      Logger.log(`QR fetch failed: ${response.getResponseCode()}`);
+      return null;
+    }
+    return response.getBlob().setContentType("image/png");
+  } catch (error) {
+    Logger.log(`QR blob error: ${error.toString()}`);
+    return null;
+  }
+}
+
+/**
+ * Send QR codes via email with inline images
  */
 function sendQRCodesEmail(email, mainGuestName, guests) {
   try {
     const subject = "VIP Guest Logistics Guide - Calvary Bible Church";
-
+    
+    // Build inline images map for CID references
+    const inlineImages = {};
+    
     const passCards = guests
-      .map((guest) => {
+      .map((guest, index) => {
         const passUrl = `${CONFIG.BASE_URL}/pass/${guest.token}`;
-        const qrInline = buildQrCodeDataUri(guest.qrData.checkInUrl);
-        const qrUrl = `https://chart.googleapis.com/chart?chs=420x420&cht=qr&chl=${encodeURIComponent(
-          guest.qrData.checkInUrl
-        )}&choe=UTF-8`;
-        const qrImageSrc = qrInline || qrUrl;
+        const cid = `qr_${index}`;
+        const qrBlob = fetchQrCodeBlob(guest.qrData.checkInUrl);
+        
+        if (qrBlob) {
+          inlineImages[cid] = qrBlob;
+        }
+        
+        // Use CID for inline image, fallback to external URL
+        const qrImageSrc = qrBlob ? `cid:${cid}` : `https://chart.googleapis.com/chart?chs=420x420&cht=qr&chl=${encodeURIComponent(guest.qrData.checkInUrl)}&choe=UTF-8`;
+        
         const guestType =
           guest.type === "VIP"
             ? "VIP Guest"
@@ -609,7 +644,7 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
 
         return `
         <div class="pass-card">
-                  <img class="pass-logo" src="${CONFIG.EVENT_LOGO_URL}" alt="${CONFIG.EVENT_HOST} logo" />
+          <img class="pass-logo" src="${CONFIG.EVENT_LOGO_URL}" alt="${CONFIG.EVENT_HOST} logo" />
           <div class="pass-chip">${guestType}</div>
           <h3>${guest.name}</h3>
           <div class="pass-meta">
@@ -618,7 +653,7 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
             <p>${CONFIG.EVENT_VENUE}</p>
           </div>
           <div class="pass-qr">
-            <img src="${qrImageSrc}" alt="QR code for ${guest.name}" />
+            <img src="${qrImageSrc}" alt="QR code for ${guest.name}" width="220" height="220" style="display:block;" />
           </div>
           <a href="${passUrl}" class="pass-link">View & Download Full Pass</a>
         </div>
@@ -701,7 +736,8 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
       </html>
     `;
 
-    if (CONFIG.MAILERLITE_ENABLED) {
+    const mlConfig = getMailerLiteConfig();
+    if (mlConfig.enabled) {
       try {
         sendEmailViaMailerLite(email, subject, htmlBody, mainGuestName);
         Logger.log(`Email sent via MailerLite to ${email}`);
@@ -713,10 +749,12 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
       }
     }
 
+    // Use MailApp with inline images for QR codes
     MailApp.sendEmail({
       to: email,
       subject: subject,
       htmlBody: htmlBody,
+      inlineImages: inlineImages,
     });
 
     Logger.log(`Email sent successfully to ${email}`);

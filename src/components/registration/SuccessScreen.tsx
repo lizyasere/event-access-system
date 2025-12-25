@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo } from "react";
-import { Mail, Check, Download, ExternalLink, Link2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { Mail, Check, ExternalLink } from "lucide-react";
 import { API_CONFIG } from "../../config/api";
 
 interface SuccessScreenProps {
@@ -35,24 +34,6 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({
       const url = `${buildPassUrl(token)}${autoPrint ? "?print=1" : ""}`;
       if (typeof window !== "undefined") {
         window.open(url, "_blank", "noopener,noreferrer");
-      }
-    },
-    [buildPassUrl]
-  );
-
-  const handleCopyLink = useCallback(
-    async (token: string) => {
-      const link = buildPassUrl(token);
-      if (typeof navigator === "undefined" || !navigator.clipboard) {
-        toast.info("Copy not supported here. Use the View Pass button instead.");
-        return;
-      }
-      try {
-        await navigator.clipboard.writeText(link);
-        toast.success("Pass link copied");
-      } catch (error) {
-        console.error("Copy failed", error);
-        toast.error("Unable to copy link. Please copy manually.");
       }
     },
     [buildPassUrl]
@@ -113,34 +94,16 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({
                     alt={`QR Code for ${qr.name}`}
                     className="w-48 h-48"
                   />
-                  <p className="text-xs text-gray-500 mt-3 uppercase tracking-wide">
-                    Quick preview · full styling inside pass
-                  </p>
+              
                 </div>
-                <div className="mt-5 space-y-3">
+                <div className="mt-5">
                   <button
                     type="button"
                     onClick={() => handleOpenPass(qr.token, true)}
-                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 transition"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download VIP Pass (PDF)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenPass(qr.token)}
-                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 border-2 border-orange-500 text-orange-600 rounded-xl font-semibold hover:bg-orange-50 transition"
+                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 transition"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    View Pass Online
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyLink(qr.token)}
-                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-gray-700 rounded-xl font-semibold border border-gray-200 hover:border-gray-300"
-                  >
-                    <Link2 className="w-4 h-4" />
-                    Copy Pass Link
+                    View &amp; Print Pass
                   </button>
                 </div>
               </div>
