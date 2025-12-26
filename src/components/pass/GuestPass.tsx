@@ -264,15 +264,6 @@ export const GuestPass: React.FC = () => {
                 Show this QR code at the gate for verification.
               </p>
             </div>
-
-            <div className="bg-orange-50 rounded-2xl p-5 text-center border border-orange-200">
-              <p className="text-sm uppercase tracking-[0.35em] text-orange-600">
-                Logistics
-              </p>
-              <p className="text-orange-900 font-semibold mt-2">
-                Protocol team will be on ground from 3:30 PM.
-              </p>
-            </div>
           </div>
         </div>
 
@@ -284,14 +275,6 @@ export const GuestPass: React.FC = () => {
           >
             <Download className="w-4 h-4" />
             Download / Print PDF
-          </button>
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="inline-flex items-center gap-2 rounded-full border-2 border-slate-900 text-slate-900 px-6 py-3 font-semibold hover:bg-slate-900 hover:text-white transition"
-          >
-            <Copy className="w-4 h-4" />
-            Copy pass link
           </button>
         </div>
       </div>

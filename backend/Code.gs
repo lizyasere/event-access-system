@@ -27,14 +27,14 @@ const SHEET_NAMES = {
   CONFIG: "Config",
 };
 
-// Read MailerLite settings from Script Properties
-function getMailerLiteConfig() {
+// Read Resend settings from Script Properties
+function getResendConfig() {
   const props = PropertiesService.getScriptProperties();
   return {
-    enabled: (props.getProperty("MAILERLITE_ENABLED") || "false").toString().trim().toLowerCase() === "true",
-    apiKey: props.getProperty("MAILERLITE_API_KEY") || "",
-    senderEmail: props.getProperty("MAILERLITE_SENDER_EMAIL") || "",
-    senderName: props.getProperty("MAILERLITE_SENDER_NAME") || "Calvary Bible Church"
+    enabled: (props.getProperty("RESEND_ENABLED") || "false").toString().trim().toLowerCase() === "true",
+    apiKey: props.getProperty("RESEND_API_KEY") || "",
+    senderEmail: props.getProperty("RESEND_SENDER_EMAIL") || "",
+    senderName: props.getProperty("RESEND_SENDER_NAME") || "Calvary Bible Church"
   };
 }
 
@@ -50,18 +50,19 @@ const CONFIG = {
   EVENT_LOGO_URL: "https://cbcis30-invite.netlify.app/branding/cbc-logo.png",
   EVENT_BANNER_URL:
     "https://cbcis30-invite.netlify.app/branding/vip-banner.svg",
-  MAILERLITE_API_URL:
-    "https://connect.mailerlite.com/api/transactional/messages",
+  RESEND_API_URL: "https://api.resend.com/emails",
 };
 
 /**
  * Build a base64 data URI for QR images so they render inline inside emails
+ * Uses goqr.me API (free and reliable)
  */
 function buildQrCodeDataUri(checkInUrl) {
   try {
-    const qrUrl = `https://chart.googleapis.com/chart?chs=420x420&cht=qr&chl=${encodeURIComponent(
+    // Using goqr.me API - free and reliable QR code generator
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(
       checkInUrl
-    )}&choe=UTF-8`;
+    )}&format=png`;
     const response = UrlFetchApp.fetch(qrUrl, { muteHttpExceptions: true });
 
     if (response.getResponseCode() >= 400) {
@@ -80,42 +81,33 @@ function buildQrCodeDataUri(checkInUrl) {
 }
 
 /**
- * Send event emails through MailerLite's transactional endpoint when enabled
+ * Send event emails through Resend's transactional API
  */
-function sendEmailViaMailerLite(toEmail, subject, htmlBody, recipientName) {
-  const mlConfig = getMailerLiteConfig();
+function sendEmailViaResend(toEmail, subject, htmlBody, recipientName) {
+  const resendConfig = getResendConfig();
   
-  if (!mlConfig.apiKey || !mlConfig.senderEmail) {
+  if (!resendConfig.apiKey || !resendConfig.senderEmail) {
     throw new Error(
-      "MailerLite is enabled but API key or sender email is missing"
+      "Resend is enabled but API key or sender email is missing"
     );
   }
 
+  const fromField = recipientName 
+    ? `${resendConfig.senderName} <${resendConfig.senderEmail}>`
+    : resendConfig.senderEmail;
+
   const payload = {
+    from: `${resendConfig.senderName} <${resendConfig.senderEmail}>`,
+    to: [toEmail],
     subject: subject,
-    from: {
-      email: mlConfig.senderEmail,
-      name: mlConfig.senderName || CONFIG.EVENT_HOST,
-    },
-    to: [
-      {
-        email: toEmail,
-        name: recipientName || toEmail,
-      },
-    ],
-    content: [
-      {
-        type: "text/html",
-        value: htmlBody,
-      },
-    ],
+    html: htmlBody,
   };
 
-  const response = UrlFetchApp.fetch(CONFIG.MAILERLITE_API_URL, {
+  const response = UrlFetchApp.fetch(CONFIG.RESEND_API_URL, {
     method: "post",
     contentType: "application/json",
     headers: {
-      Authorization: `Bearer ${mlConfig.apiKey}`,
+      Authorization: `Bearer ${resendConfig.apiKey}`,
     },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
@@ -124,7 +116,7 @@ function sendEmailViaMailerLite(toEmail, subject, htmlBody, recipientName) {
   const statusCode = response.getResponseCode();
   if (statusCode >= 400) {
     throw new Error(
-      `MailerLite API error (${statusCode}): ${response.getContentText()}`
+      `Resend API error (${statusCode}): ${response.getContentText()}`
     );
   }
 
@@ -140,9 +132,40 @@ function onOpen() {
   ui.createMenu("Event System")
     .addItem("Setup Sheets", "setupSheets")
     .addItem("Test Email", "testEmail")
+    .addItem("Debug Resend Config", "debugResendConfig")
     .addSeparator()
     .addItem("Export Guests", "exportGuests")
     .addToUi();
+}
+
+/**
+ * Debug function to check Resend configuration
+ * Run this to see if your Script Properties are set correctly
+ */
+function debugResendConfig() {
+  const ui = SpreadsheetApp.getUi();
+  const resendConfig = getResendConfig();
+  
+  const message = `
+Resend Configuration Status:
+================================
+Enabled: ${resendConfig.enabled} (should be true)
+API Key: ${resendConfig.apiKey ? "SET (" + resendConfig.apiKey.substring(0, 10) + "...)" : "NOT SET"}
+Sender Email: ${resendConfig.senderEmail || "NOT SET"}
+Sender Name: ${resendConfig.senderName || "NOT SET"}
+
+If any value shows "NOT SET", go to:
+Project Settings → Script Properties → Add property
+
+Required properties:
+- RESEND_ENABLED = true
+- RESEND_API_KEY = re_xxxxxx (your Resend API key)
+- RESEND_SENDER_EMAIL = cbcinfo@trucalms.org
+- RESEND_SENDER_NAME = Calvary Bible Church
+  `;
+  
+  ui.alert("Resend Debug", message, ui.ButtonSet.OK);
+  Logger.log(message);
 }
 
 /**
@@ -592,12 +615,13 @@ function getGuestByToken(token) {
 
 /**
  * Fetch QR code image as a blob for inline email attachment
+ * Uses goqr.me API (free and reliable)
  */
 function fetchQrCodeBlob(checkInUrl) {
   try {
-    const qrUrl = `https://chart.googleapis.com/chart?chs=420x420&cht=qr&chl=${encodeURIComponent(
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(
       checkInUrl
-    )}&choe=UTF-8`;
+    )}&format=png`;
     const response = UrlFetchApp.fetch(qrUrl, { muteHttpExceptions: true });
     if (response.getResponseCode() >= 400) {
       Logger.log(`QR fetch failed: ${response.getResponseCode()}`);
@@ -631,7 +655,7 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
         }
         
         // Use CID for inline image, fallback to external URL
-        const qrImageSrc = qrBlob ? `cid:${cid}` : `https://chart.googleapis.com/chart?chs=420x420&cht=qr&chl=${encodeURIComponent(guest.qrData.checkInUrl)}&choe=UTF-8`;
+        const qrImageSrc = qrBlob ? `cid:${cid}` : `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(guest.qrData.checkInUrl)}&format=png`;
         
         const guestType =
           guest.type === "VIP"
@@ -736,25 +760,29 @@ function sendQRCodesEmail(email, mainGuestName, guests) {
       </html>
     `;
 
-    const mlConfig = getMailerLiteConfig();
-    if (mlConfig.enabled) {
+    const resendConfig = getResendConfig();
+    if (resendConfig.enabled) {
       try {
-        sendEmailViaMailerLite(email, subject, htmlBody, mainGuestName);
-        Logger.log(`Email sent via MailerLite to ${email}`);
+        sendEmailViaResend(email, subject, htmlBody, mainGuestName);
+        Logger.log(`Email sent via Resend to ${email}`);
         return true;
-      } catch (mailerLiteError) {
+      } catch (resendError) {
         Logger.log(
-          `MailerLite send error: ${mailerLiteError.toString()}. Falling back to MailApp.`
+          `Resend send error: ${resendError.toString()}. Falling back to MailApp.`
         );
       }
     }
 
     // Use MailApp with inline images for QR codes
+    // Set a professional sender name (email will still show your Gmail address)
+    const senderName = resendConfig.senderName || CONFIG.EVENT_HOST || "Calvary Bible Church";
+    
     MailApp.sendEmail({
       to: email,
       subject: subject,
       htmlBody: htmlBody,
       inlineImages: inlineImages,
+      name: senderName,  // Display name shown in recipient's inbox
     });
 
     Logger.log(`Email sent successfully to ${email}`);
