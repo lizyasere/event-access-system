@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { Download, Copy, Loader2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { Download, Loader2 } from "lucide-react";
 import type { GuestData } from "../../types";
 import { apiService } from "../../services/api";
 import { API_CONFIG } from "../../config/api";
@@ -122,32 +121,12 @@ export const GuestPass: React.FC = () => {
     };
   }, [token]);
 
-  const passLink = useMemo(() => {
-    if (typeof window === "undefined" || !token) return "";
-    return `${window.location.origin}/pass/${token}`;
-  }, [token]);
-
   const qrValue = useMemo(() => {
     const baseUrl =
       API_CONFIG.CHECK_IN_BASE_URL ||
       (typeof window !== "undefined" ? window.location.origin : "");
     return token ? `${baseUrl}/checkin/${token}` : "";
   }, [token]);
-
-  const handleCopyLink = async () => {
-    if (!passLink) return;
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(passLink);
-        toast.success("Pass link copied");
-      } else {
-        throw new Error("Clipboard unsupported");
-      }
-    } catch (err) {
-      console.error("Copy failed", err);
-      toast.error("Unable to copy link. Please copy manually.");
-    }
-  };
 
   const handleDownloadPdf = () => {
     window.print();
