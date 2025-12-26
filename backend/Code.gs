@@ -86,18 +86,32 @@ function buildQrCodeDataUri(checkInUrl) {
 function sendEmailViaResend(toEmail, subject, htmlBody, recipientName) {
   const resendConfig = getResendConfig();
   
-  if (!resendConfig.apiKey || !resendConfig.senderEmail) {
-    throw new Error(
-      "Resend is enabled but API key or sender email is missing"
-    );
+  if (!resendConfig.apiKey) {
+    throw new Error("Resend API key is missing");
+  }
+  
+  if (!resendConfig.senderEmail) {
+    throw new Error("Resend sender email is missing");
   }
 
-  const fromField = recipientName 
-    ? `${resendConfig.senderName} <${resendConfig.senderEmail}>`
-    : resendConfig.senderEmail;
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(resendConfig.senderEmail)) {
+    throw new Error(`Invalid sender email format: "${resendConfig.senderEmail}"`);
+  }
+
+  // Build the from field - handle cases with and without sender name
+  let fromField;
+  if (resendConfig.senderName && resendConfig.senderName.trim()) {
+    fromField = `${resendConfig.senderName.trim()} <${resendConfig.senderEmail.trim()}>`;
+  } else {
+    fromField = resendConfig.senderEmail.trim();
+  }
+
+  Logger.log(`Resend from field: ${fromField}`);
 
   const payload = {
-    from: `${resendConfig.senderName} <${resendConfig.senderEmail}>`,
+    from: fromField,
     to: [toEmail],
     subject: subject,
     html: htmlBody,
