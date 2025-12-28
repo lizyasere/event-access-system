@@ -50,7 +50,8 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({
             Registration Successful!
           </h1>
           <p className="text-xl text-gray-600">
-            Welcome, <span className="font-bold text-orange-600">{mainGuestName}</span>
+            Welcome,{" "}
+            <span className="font-bold text-orange-600">{mainGuestName}</span>
           </p>
         </div>
 
@@ -63,9 +64,6 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({
               <p className="text-lg font-bold text-gray-900 mb-2">
                 VIP Passes Sent to Your Email
               </p>
-              <p className="text-gray-700 leading-relaxed">
-                Each guest now has a personalized QR credential that matches the official pass template. Use the buttons below to open or download the full pass instantly.
-              </p>
             </div>
           </div>
         </div>
@@ -75,9 +73,6 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({
             <h2 className="text-2xl font-bold text-gray-900">
               Digital VIP Passes
             </h2>
-            <p className="text-sm text-gray-500">
-              Downloads open the new branded layout automatically.
-            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {qrCodes.map((qr, idx) => (
@@ -94,7 +89,6 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({
                     alt={`QR Code for ${qr.name}`}
                     className="w-48 h-48"
                   />
-              
                 </div>
                 <div className="mt-5">
                   <button
@@ -109,12 +103,6 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-6 mb-8">
-          <p className="text-gray-900 font-medium">
-            <strong className="text-amber-800">Important:</strong> Share the pass links with associates so they can present the branded credential on arrival. Each pass also supports printing for physical access cards.
-          </p>
         </div>
 
         <button

@@ -628,8 +628,31 @@ function getGuestByToken(token) {
 // ============================================================================
 
 /**
- * Fetch QR code image as a blob for inline email attachment
- * Uses goqr.me API (free and reliable)
+ * Fetch QR code image as base64 data URI
+ * Uses qrserver.com API (free and reliable)
+ */
+function fetchQrCodeAsBase64(checkInUrl) {
+  try {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(
+      checkInUrl
+    )}&format=png`;
+    const response = UrlFetchApp.fetch(qrUrl, { muteHttpExceptions: true });
+    if (response.getResponseCode() >= 400) {
+      Logger.log(`QR fetch failed: ${response.getResponseCode()}`);
+      return null;
+    }
+    const blob = response.getBlob();
+    const base64 = Utilities.base64Encode(blob.getBytes());
+    return `data:image/png;base64,${base64}`;
+  } catch (error) {
+    Logger.log(`QR base64 error: ${error.toString()}`);
+    return null;
+  }
+}
+
+/**
+ * Fetch QR code image as a blob for inline email attachment (Gmail only)
+ * Uses qrserver.com API (free and reliable)
  */
 function fetchQrCodeBlob(checkInUrl) {
   try {
@@ -649,155 +672,204 @@ function fetchQrCodeBlob(checkInUrl) {
 }
 
 /**
- * Send QR codes via email with inline images
+ * Build pass card HTML for a guest
+ */
+function buildPassCardHtml(guest, qrImageSrc) {
+  const passUrl = `${CONFIG.BASE_URL}/pass/${guest.token}`;
+  const guestType =
+    guest.type === "VIP"
+      ? "VIP Guest"
+      : guest.type === "SPOUSE"
+      ? "Spouse"
+      : guest.type === "PA"
+      ? "Personal Assistant"
+      : "Associate";
+
+  return `
+    <div class="pass-card">
+      <img class="pass-logo" src="${CONFIG.EVENT_LOGO_URL}" alt="${CONFIG.EVENT_HOST} logo" />
+      <div class="pass-chip">${guestType}</div>
+      <h3>${guest.name}</h3>
+      <div class="pass-meta">
+        <p>${CONFIG.EVENT_DATE}</p>
+        <p>${CONFIG.EVENT_GATE_TIME}</p>
+        <p>${CONFIG.EVENT_VENUE}</p>
+      </div>
+      <div class="pass-qr">
+        <img src="${qrImageSrc}" alt="QR code for ${guest.name}" width="220" height="220" style="display:block;" />
+      </div>
+      <a href="${passUrl}" class="pass-link">View & Download Full Pass</a>
+    </div>
+  `;
+}
+
+/**
+ * Build full email HTML body
+ */
+function buildEmailHtml(mainGuestName, passCards) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; color: #1f2937; }
+        .wrapper { max-width: 640px; margin: 0 auto; padding: 32px 20px; }
+        .hero { position: relative; border-radius: 28px; overflow: hidden; text-align: center; }
+        .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(15,23,42,0.92), rgba(76,29,149,0.85)); }
+        .hero-overlay { position: relative; padding: 40px 32px; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+        .hero-logo { width: 86px; height: 86px; border-radius: 24px; background: rgba(255,255,255,0.08); padding: 12px; object-fit: contain; border: 1px solid rgba(255,255,255,0.2); }
+        .hero .eyebrow { text-transform: uppercase; letter-spacing: 0.4em; font-size: 12px; color: #fbbf24; margin-bottom: 12px; }
+        .message { background: #ffffff; margin-top: 16px; padding: 28px; border-radius: 24px; line-height: 1.7; }
+        .logistics h4 { margin-bottom: 4px; color: #c2410c; text-transform: uppercase; letter-spacing: 0.25em; font-size: 12px; }
+        .logistics ul { padding-left: 18px; margin-top: 8px; margin-bottom: 16px; }
+        .logistics li { margin-bottom: 6px; }
+        .contact-card { background: #fffbeb; border: 1px solid #facc15; padding: 16px; border-radius: 16px; margin-top: 16px; font-weight: 600; }
+        .pass-card { background: linear-gradient(135deg, #0f172a, #1e1b4b, #a21caf); color: #fff; border-radius: 32px; padding: 32px; margin-top: 24px; text-align: center; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35); position: relative; overflow: hidden; }
+        .pass-card::after { content: ""; position: absolute; inset: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 28px; pointer-events: none; }
+        .pass-card > * { position: relative; z-index: 1; }
+        .pass-chip { display: inline-block; background: rgba(255,255,255,0.1); border-radius: 999px; padding: 6px 18px; letter-spacing: 0.3em; font-size: 11px; text-transform: uppercase; }
+        .pass-logo { width: 60px; height: 60px; margin: 0 auto 12px; border-radius: 16px; background: rgba(255,255,255,0.08); padding: 10px; object-fit: contain; border: 1px solid rgba(255,255,255,0.2); }
+        .pass-card h3 { font-size: 26px; margin: 16px 0 8px; }
+        .pass-meta { font-size: 14px; line-height: 1.4; color: #e5e7eb; }
+        .pass-qr { background: #fff; padding: 18px; border-radius: 24px; margin: 20px auto; width: fit-content; }
+        .pass-qr img { width: 220px; height: 220px; display: block; }
+        .pass-link { display: inline-block; margin-top: 8px; padding: 12px 24px; background: #f97316; color: #fff; text-decoration: none; border-radius: 999px; font-weight: 600; }
+        .footer { text-align: center; margin-top: 28px; font-size: 12px; color: #6b7280; }
+      </style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="hero" style="background-image: url('${CONFIG.EVENT_BANNER_URL}'); background-size: cover; background-position: center;">
+          <div class="hero-overlay">
+            <img class="hero-logo" src="${CONFIG.EVENT_LOGO_URL}" alt="${CONFIG.EVENT_HOST} logo" />
+            <p class="eyebrow">${CONFIG.EVENT_HOST}</p>
+            <h1>VIP Guest Logistics Guide</h1>
+            <p>${CONFIG.EVENT_NAME}</p>
+          </div>
+        </div>
+
+        <div class="message">
+          <p>Dear ${mainGuestName},</p>
+          <p>We are delighted to welcome you as our VIP Guest at the Anniversary Celebration on December 28, at 4:00 PM prompt. Our team will be on ground from 3:30 PM to ensure a seamless and memorable experience. Kindly review the brief logistics below.</p>
+
+          <div class="logistics">
+            <h4>VIP Guest</h4>
+            <ul>
+              <li>E-Access Card: Attached for you and your listed associates/PA. Please present it (printed or digital) on arrival.</li>
+              <li>Arrival & Drop-Off: Proceed to the main gate, present your E-Access Card, and you will be directed to the drop-off point. Our Protocol Team will escort you and your spouse to your seats.</li>
+              <li>Parking: Your vehicle will be guided to the designated VIP parking area.</li>
+            </ul>
+
+            <h4>VIP Associates</h4>
+            <ul>
+              <li>Arrival & Entry: Associates should present their E-Access Cards at the main gate, park as directed, and receive wristbands from the Protocol Team.</li>
+            </ul>
+          </div>
+
+          <div class="contact-card">
+            For inquiries, please contact Mr. Femi Adelugba on 0803 451 3465 or Mr. Excellence Aliu on 0806 622 7712.
+          </div>
+
+          <p style="margin-top: 18px;">We look forward to receiving you.</p>
+        </div>
+
+        ${passCards}
+
+        <p class="footer">${CONFIG.EVENT_HOST} Protocol Team · This is an automated email.</p>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * Send QR codes via email - uses Resend if enabled, falls back to Gmail
  */
 function sendQRCodesEmail(email, mainGuestName, guests) {
   try {
     const subject = "VIP Guest Logistics Guide - Calvary Bible Church";
+    const resendConfig = getResendConfig();
     
-    // Build inline images map for CID references
-    const inlineImages = {};
+    // For Resend: Use base64 data URIs (CID doesn't work)
+    // For Gmail: Use CID inline images
+    const useResend = resendConfig.enabled && resendConfig.apiKey && resendConfig.senderEmail;
     
-    const passCards = guests
-      .map((guest, index) => {
-        const passUrl = `${CONFIG.BASE_URL}/pass/${guest.token}`;
+    const inlineImages = {}; // Only used for Gmail fallback
+    const passCardsHtml = [];
+    
+    guests.forEach((guest, index) => {
+      let qrImageSrc;
+      
+      if (useResend) {
+        // For Resend: embed QR as base64 data URI
+        const base64Qr = fetchQrCodeAsBase64(guest.qrData.checkInUrl);
+        qrImageSrc = base64Qr || `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(guest.qrData.checkInUrl)}&format=png`;
+      } else {
+        // For Gmail: use CID reference
         const cid = `qr_${index}`;
         const qrBlob = fetchQrCodeBlob(guest.qrData.checkInUrl);
-        
         if (qrBlob) {
           inlineImages[cid] = qrBlob;
+          qrImageSrc = `cid:${cid}`;
+        } else {
+          qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(guest.qrData.checkInUrl)}&format=png`;
         }
-        
-        // Use CID for inline image, fallback to external URL
-        const qrImageSrc = qrBlob ? `cid:${cid}` : `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(guest.qrData.checkInUrl)}&format=png`;
-        
-        const guestType =
-          guest.type === "VIP"
-            ? "VIP Guest"
-            : guest.type === "SPOUSE"
-            ? "Spouse"
-            : guest.type === "PA"
-            ? "Personal Assistant"
-            : "Associate";
+      }
+      
+      passCardsHtml.push(buildPassCardHtml(guest, qrImageSrc));
+    });
+    
+    const htmlBody = buildEmailHtml(mainGuestName, passCardsHtml.join("\n"));
 
-        return `
-        <div class="pass-card">
-          <img class="pass-logo" src="${CONFIG.EVENT_LOGO_URL}" alt="${CONFIG.EVENT_HOST} logo" />
-          <div class="pass-chip">${guestType}</div>
-          <h3>${guest.name}</h3>
-          <div class="pass-meta">
-            <p>${CONFIG.EVENT_DATE}</p>
-            <p>${CONFIG.EVENT_GATE_TIME}</p>
-            <p>${CONFIG.EVENT_VENUE}</p>
-          </div>
-          <div class="pass-qr">
-            <img src="${qrImageSrc}" alt="QR code for ${guest.name}" width="220" height="220" style="display:block;" />
-          </div>
-          <a href="${passUrl}" class="pass-link">View & Download Full Pass</a>
-        </div>
-      `;
-      })
-      .join("\n");
-
-    const htmlBody = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; color: #1f2937; }
-          .wrapper { max-width: 640px; margin: 0 auto; padding: 32px 20px; }
-            .hero { position: relative; border-radius: 28px; overflow: hidden; text-align: center; }
-          .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(15,23,42,0.92), rgba(76,29,149,0.85)); }
-          .hero-overlay { position: relative; padding: 40px 32px; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 16px; }
-          .hero-logo { width: 86px; height: 86px; border-radius: 24px; background: rgba(255,255,255,0.08); padding: 12px; object-fit: contain; border: 1px solid rgba(255,255,255,0.2); }
-          .hero .eyebrow { text-transform: uppercase; letter-spacing: 0.4em; font-size: 12px; color: #fbbf24; margin-bottom: 12px; }
-          .message { background: #ffffff; margin-top: 16px; padding: 28px; border-radius: 24px; line-height: 1.7; }
-          .logistics h4 { margin-bottom: 4px; color: #c2410c; text-transform: uppercase; letter-spacing: 0.25em; font-size: 12px; }
-          .logistics ul { padding-left: 18px; margin-top: 8px; margin-bottom: 16px; }
-          .logistics li { margin-bottom: 6px; }
-          .contact-card { background: #fffbeb; border: 1px solid #facc15; padding: 16px; border-radius: 16px; margin-top: 16px; font-weight: 600; }
-          .pass-card { background: linear-gradient(135deg, #0f172a, #1e1b4b, #a21caf); color: #fff; border-radius: 32px; padding: 32px; margin-top: 24px; text-align: center; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35); position: relative; overflow: hidden; }
-          .pass-card::after { content: ""; position: absolute; inset: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 28px; pointer-events: none; }
-          .pass-card > * { position: relative; z-index: 1; }
-          .pass-chip { display: inline-block; background: rgba(255,255,255,0.1); border-radius: 999px; padding: 6px 18px; letter-spacing: 0.3em; font-size: 11px; text-transform: uppercase; }
-          .pass-logo { width: 60px; height: 60px; margin: 0 auto 12px; border-radius: 16px; background: rgba(255,255,255,0.08); padding: 10px; object-fit: contain; border: 1px solid rgba(255,255,255,0.2); }
-          .pass-card h3 { font-size: 26px; margin: 16px 0 8px; }
-          .pass-meta { font-size: 14px; line-height: 1.4; color: #e5e7eb; }
-          .pass-qr { background: #fff; padding: 18px; border-radius: 24px; margin: 20px auto; width: fit-content; }
-          .pass-qr img { width: 220px; height: 220px; display: block; }
-          .pass-link { display: inline-block; margin-top: 8px; padding: 12px 24px; background: #f97316; color: #fff; text-decoration: none; border-radius: 999px; font-weight: 600; }
-          .footer { text-align: center; margin-top: 28px; font-size: 12px; color: #6b7280; }
-        </style>
-      </head>
-      <body>
-        <div class="wrapper">
-          <div class="hero" style="background-image: url('${CONFIG.EVENT_BANNER_URL}'); background-size: cover; background-position: center;">
-            <div class="hero-overlay">
-              <img class="hero-logo" src="${CONFIG.EVENT_LOGO_URL}" alt="${CONFIG.EVENT_HOST} logo" />
-              <p class="eyebrow">${CONFIG.EVENT_HOST}</p>
-              <h1>VIP Guest Logistics Guide</h1>
-              <p>${CONFIG.EVENT_NAME}</p>
-            </div>
-          </div>
-
-          <div class="message">
-            <p>Dear ${mainGuestName},</p>
-            <p>We are delighted to welcome you as our VIP Guest at the Anniversary Celebration on December 28, at 4:00 PM prompt. Our team will be on ground from 3:30 PM to ensure a seamless and memorable experience. Kindly review the brief logistics below.</p>
-
-            <div class="logistics">
-              <h4>VIP Guest</h4>
-              <ul>
-                <li>E-Access Card: Attached for you and your listed associates/PA. Please present it (printed or digital) on arrival.</li>
-                <li>Arrival & Drop-Off: Proceed to the main gate, present your E-Access Card, and you will be directed to the drop-off point. Our Protocol Team will escort you and your spouse to your seats.</li>
-                <li>Parking: Your vehicle will be guided to the designated VIP parking area.</li>
-              </ul>
-
-              <h4>VIP Associates</h4>
-              <ul>
-                <li>Arrival & Entry: Associates should present their E-Access Cards at the main gate, park as directed, and receive wristbands from the Protocol Team.</li>
-              </ul>
-            </div>
-
-            <div class="contact-card">
-              For inquiries, please contact Mr. Femi Adelugba on 0803 451 3465 or Mr. Excellence Aliu on 0806 622 7712.
-            </div>
-
-            <p style="margin-top: 18px;">We look forward to receiving you.</p>
-          </div>
-
-          ${passCards}
-
-          <p class="footer">${CONFIG.EVENT_HOST} Protocol Team · This is an automated email.</p>
-        </div>
-      </body>
-      </html>
-    `;
-
-    const resendConfig = getResendConfig();
-    if (resendConfig.enabled) {
+    if (useResend) {
       try {
         sendEmailViaResend(email, subject, htmlBody, mainGuestName);
         Logger.log(`Email sent via Resend to ${email}`);
         return true;
       } catch (resendError) {
-        Logger.log(
-          `Resend send error: ${resendError.toString()}. Falling back to MailApp.`
-        );
+        Logger.log(`Resend send error: ${resendError.toString()}. Falling back to MailApp.`);
+        // Fall through to Gmail
       }
     }
 
-    // Use MailApp with inline images for QR codes
-    // Set a professional sender name (email will still show your Gmail address)
+    // Gmail fallback with CID inline images
     const senderName = resendConfig.senderName || CONFIG.EVENT_HOST || "Calvary Bible Church";
     
-    MailApp.sendEmail({
-      to: email,
-      subject: subject,
-      htmlBody: htmlBody,
-      inlineImages: inlineImages,
-      name: senderName,  // Display name shown in recipient's inbox
-    });
+    // Rebuild pass cards for Gmail if we fell back from Resend
+    if (useResend) {
+      // Need to rebuild with CID references for Gmail
+      const gmailPassCardsHtml = [];
+      guests.forEach((guest, index) => {
+        const cid = `qr_${index}`;
+        const qrBlob = fetchQrCodeBlob(guest.qrData.checkInUrl);
+        let qrImageSrc;
+        if (qrBlob) {
+          inlineImages[cid] = qrBlob;
+          qrImageSrc = `cid:${cid}`;
+        } else {
+          qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(guest.qrData.checkInUrl)}&format=png`;
+        }
+        gmailPassCardsHtml.push(buildPassCardHtml(guest, qrImageSrc));
+      });
+      const gmailHtmlBody = buildEmailHtml(mainGuestName, gmailPassCardsHtml.join("\n"));
+      
+      MailApp.sendEmail({
+        to: email,
+        subject: subject,
+        htmlBody: gmailHtmlBody,
+        inlineImages: inlineImages,
+        name: senderName,
+      });
+    } else {
+      MailApp.sendEmail({
+        to: email,
+        subject: subject,
+        htmlBody: htmlBody,
+        inlineImages: inlineImages,
+        name: senderName,
+      });
+    }
 
     Logger.log(`Email sent successfully to ${email}`);
     return true;
