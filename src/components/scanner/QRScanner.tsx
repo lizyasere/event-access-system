@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { Camera, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import { Camera, AlertCircle, CheckCircle2, XCircle, Lock } from "lucide-react";
 import { qrService } from "../../services/qr";
 import { apiService } from "../../services/api";
 import type { GuestData, CheckInResponse } from "../../types";
@@ -8,6 +8,10 @@ import { GuestDetails } from "./GuestDetails";
 import { API_CONFIG } from "../../config/api";
 
 export const QRScanner: React.FC = () => {
+  const [isPinVerified, setIsPinVerified] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scannedGuest, setScannedGuest] = useState<GuestData | null>(null);
   const [checkInResult, setCheckInResult] = useState<CheckInResponse | null>(null);
@@ -18,6 +22,40 @@ export const QRScanner: React.FC = () => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraPreparing, setIsCameraPreparing] = useState(false);
   const cameraRef = useRef<Html5Qrcode | null>(null);
+
+  const verifyPin = async () => {
+    if (!pinInput.trim()) {
+      setPinError("Please enter the scanner PIN");
+      return;
+    }
+
+    setIsVerifyingPin(true);
+    setPinError(null);
+
+    try {
+      const response = await apiService.validateScannerPin(pinInput);
+      if (response.success) {
+        setIsPinVerified(true);
+        // Store in session so they don't have to re-enter on page refresh
+        sessionStorage.setItem("scannerPinVerified", "true");
+      } else {
+        setPinError("Invalid PIN. Please contact the event administrator.");
+      }
+    } catch (err) {
+      setPinError("Unable to verify PIN. Please try again.");
+      console.error(err);
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
+
+  // Check session storage on mount
+  useEffect(() => {
+    const verified = sessionStorage.getItem("scannerPinVerified");
+    if (verified === "true") {
+      setIsPinVerified(true);
+    }
+  }, []);
 
   const onScanSuccess = useCallback(
     async (decodedText: string) => {
@@ -163,6 +201,70 @@ export const QRScanner: React.FC = () => {
 
   const guestToShow = checkInResult?.guest ?? scannedGuest;
   const shouldShowScannerViewport = isScanning && !checkInResult;
+
+  // PIN verification screen
+  if (!isPinVerified) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50 p-4 py-12">
+        <div className="max-w-md mx-auto">
+          <div className="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
+            <div className="flex items-center justify-center mb-6">
+              <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-5 shadow-lg">
+                <Lock className="w-12 h-12 text-white" />
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold text-center text-gray-900 mb-3">
+              Scanner Access
+            </h1>
+            <p className="text-center text-gray-600 mb-8">
+              Enter the scanner PIN to access the check-in system
+            </p>
+            
+            <div className="space-y-4">
+              <input
+                type="password"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && verifyPin()}
+                placeholder="Enter PIN"
+                maxLength={6}
+                className="w-full px-5 py-4 text-center text-2xl tracking-widest border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+              />
+              
+              {pinError && (
+                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm font-medium text-red-800">{pinError}</p>
+                </div>
+              )}
+              
+              <button
+                onClick={verifyPin}
+                disabled={isVerifyingPin}
+                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+              >
+                {isVerifyingPin ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-5 h-5" />
+                    Unlock Scanner
+                  </>
+                )}
+              </button>
+            </div>
+            
+            <p className="text-center text-sm text-gray-500 mt-6">
+              Contact the event administrator for the scanner PIN
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50 p-4 py-12">

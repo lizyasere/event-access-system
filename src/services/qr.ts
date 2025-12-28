@@ -4,13 +4,14 @@ import { API_CONFIG } from "../config/api";
 export const qrService = {
   /**
    * Generate QR code image from secure token
-   * QR contains only the check-in URL, not guest data
+   * QR contains only the pass URL, not guest data
    */
   async generateQRCodeImage(token: string): Promise<string> {
     try {
-      const checkInUrl = `${API_CONFIG.CHECK_IN_BASE_URL}/checkin/${token}`;
+      // Use /pass/ instead of /checkin/ so guests see their pass, not the scanner
+      const passUrl = `${API_CONFIG.CHECK_IN_BASE_URL}/pass/${token}`;
       
-      const qrDataUrl = await QRCode.toDataURL(checkInUrl, {
+      const qrDataUrl = await QRCode.toDataURL(passUrl, {
         errorCorrectionLevel: "H", // High error correction for better scanning
         width: 500,
         margin: 2,
@@ -48,11 +49,13 @@ export const qrService = {
 
   /**
    * Parse scanned QR code URL to extract token
+   * Supports both /pass/ and /checkin/ URLs for backwards compatibility
    */
   parseQRCodeUrl(url: string): string | null {
     try {
-      const match = url.match(/\/checkin\/([a-zA-Z0-9-]+)/);
-      return match ? match[1] : null;
+      // Match both /pass/ and /checkin/ URLs
+      const match = url.match(/\/(pass|checkin)\/([a-zA-Z0-9-]+)/);
+      return match ? match[2] : null;
     } catch {
       return null;
     }

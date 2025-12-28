@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import type { GuestData } from "../../types";
 import { apiService } from "../../services/api";
 import { API_CONFIG } from "../../config/api";
@@ -125,7 +125,8 @@ export const GuestPass: React.FC = () => {
     const baseUrl =
       API_CONFIG.CHECK_IN_BASE_URL ||
       (typeof window !== "undefined" ? window.location.origin : "");
-    return token ? `${baseUrl}/checkin/${token}` : "";
+    // Use /pass/ URL so scanning shows the pass, not the scanner
+    return token ? `${baseUrl}/pass/${token}` : "";
   }, [token]);
 
   const handleDownloadPdf = () => {
@@ -142,13 +143,60 @@ export const GuestPass: React.FC = () => {
 
   if (error || !guest) {
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center text-center px-6">
-        <p className="text-xl font-semibold text-gray-800 mb-4">
-          {error || "Guest not found"}
-        </p>
-        <Link to="/" className="text-orange-600 font-medium underline">
-          Go back to registration
-        </Link>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50 flex flex-col items-center justify-center text-center px-6">
+        <div className="bg-white rounded-3xl p-8 shadow-xl border border-gray-100 max-w-md w-full">
+          <div className="flex items-center justify-center mb-6">
+            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-4 shadow-lg">
+              <AlertCircle className="w-10 h-10 text-white" />
+            </div>
+          </div>
+          
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">
+            Unable to Load Pass
+          </h2>
+          
+          <p className="text-gray-600 mb-6">
+            {error || "We couldn't find your guest pass. This could happen if:"}
+          </p>
+          
+          {!error && (
+            <ul className="text-left text-sm text-gray-600 mb-6 space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="text-orange-500 mt-1">•</span>
+                The link has expired or is invalid
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-orange-500 mt-1">•</span>
+                There's a temporary connection issue
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-orange-500 mt-1">•</span>
+                The registration hasn't been completed yet
+              </li>
+            </ul>
+          )}
+          
+          <div className="space-y-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-5 h-5" />
+              Try Again
+            </button>
+            
+            <Link 
+              to="/" 
+              className="block w-full bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-200 transition-all"
+            >
+              Register as New Guest
+            </Link>
+          </div>
+          
+          <p className="text-xs text-gray-500 mt-6">
+            If you continue having issues, please contact the event administrator.
+          </p>
+        </div>
       </div>
     );
   }

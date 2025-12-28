@@ -149,6 +149,10 @@ function onOpen() {
     .addItem("Debug Resend Config", "debugResendConfig")
     .addSeparator()
     .addItem("Export Guests", "exportGuests")
+    .addSeparator()
+    .addItem("Reset All Check-Ins", "resetAllCheckIns")
+    .addItem("Reset Check-Ins for Day", "resetCheckInsForDay")
+    .addItem("Set Scanner PIN", "setScannerPin")
     .addToUi();
 }
 
@@ -353,7 +357,7 @@ function registerGuests(data) {
       type: "VIP",
       qrData: {
         token: vipToken,
-        checkInUrl: `${CONFIG.BASE_URL}/checkin/${vipToken}`,
+        checkInUrl: `${CONFIG.BASE_URL}/pass/${vipToken}`,
       },
     });
 
@@ -390,7 +394,7 @@ function registerGuests(data) {
         type: "SPOUSE",
         qrData: {
           token: spouseToken,
-          checkInUrl: `${CONFIG.BASE_URL}/checkin/${spouseToken}`,
+          checkInUrl: `${CONFIG.BASE_URL}/pass/${spouseToken}`,
         },
       });
     }
@@ -433,7 +437,7 @@ function registerGuests(data) {
         type: assocType,
         qrData: {
           token: assocToken,
-          checkInUrl: `${CONFIG.BASE_URL}/checkin/${assocToken}`,
+          checkInUrl: `${CONFIG.BASE_URL}/pass/${assocToken}`,
         },
       });
     });
@@ -900,7 +904,7 @@ function testEmail() {
         type: "VIP",
         qrData: {
           token: "TOK-test-123",
-          checkInUrl: `${CONFIG.BASE_URL}/checkin/TOK-test-123`,
+          checkInUrl: `${CONFIG.BASE_URL}/pass/TOK-test-123`,
         },
       },
     ];
@@ -926,6 +930,15 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify(guest)).setMimeType(
       ContentService.MimeType.JSON
     );
+  }
+
+  // Validate scanner PIN
+  if (action === "validatePin") {
+    const pin = e.parameter.pin;
+    const isValid = validateScannerPin(pin);
+    return ContentService.createTextOutput(
+      JSON.stringify({ success: isValid, message: isValid ? "PIN valid" : "Invalid PIN" })
+    ).setMimeType(ContentService.MimeType.JSON);
   }
 
   return ContentService.createTextOutput(
@@ -986,4 +999,126 @@ function exportGuests() {
   SpreadsheetApp.getUi().alert(
     "Guests exported to your Google Drive as 'guests_export.csv'"
   );
+}
+
+/**
+ * Reset all check-ins (CAUTION: This clears all check-in records!)
+ * Run this from Apps Script or add to menu
+ */
+function resetAllCheckIns() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    "Reset All Check-Ins",
+    "WARNING: This will delete ALL check-in records. Are you sure?",
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response === ui.Button.YES) {
+    const checkInSheet = getOrCreateSheet(SHEET_NAMES.CHECK_INS);
+    const lastRow = checkInSheet.getLastRow();
+    
+    if (lastRow > 1) {
+      // Delete all rows except header
+      checkInSheet.deleteRows(2, lastRow - 1);
+      ui.alert("Success", "All check-in records have been deleted.", ui.ButtonSet.OK);
+      Logger.log("All check-ins reset by user");
+    } else {
+      ui.alert("Info", "No check-in records to delete.", ui.ButtonSet.OK);
+    }
+  }
+}
+
+/**
+ * Reset check-ins for a specific day
+ */
+function resetCheckInsForDay() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt(
+    "Reset Check-Ins for Day",
+    "Enter the day to reset (e.g., 'Day 1' or 'Day 2'):",
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response.getSelectedButton() === ui.Button.OK) {
+    const day = response.getResponseText().trim();
+    if (!day) {
+      ui.alert("Error", "Please enter a valid day.", ui.ButtonSet.OK);
+      return;
+    }
+
+    const checkInSheet = getOrCreateSheet(SHEET_NAMES.CHECK_INS);
+    const data = checkInSheet.getDataRange().getValues();
+    const rowsToDelete = [];
+
+    // Find rows matching the day (column D = index 3)
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (data[i][3] === day) {
+        rowsToDelete.push(i + 1); // +1 for 1-based row index
+      }
+    }
+
+    if (rowsToDelete.length === 0) {
+      ui.alert("Info", `No check-ins found for "${day}".`, ui.ButtonSet.OK);
+      return;
+    }
+
+    const confirm = ui.alert(
+      "Confirm Reset",
+      `Found ${rowsToDelete.length} check-ins for "${day}". Delete them?`,
+      ui.ButtonSet.YES_NO
+    );
+
+    if (confirm === ui.Button.YES) {
+      // Delete rows from bottom to top to preserve indices
+      rowsToDelete.forEach(row => {
+        checkInSheet.deleteRow(row);
+      });
+      ui.alert("Success", `Deleted ${rowsToDelete.length} check-ins for "${day}".`, ui.ButtonSet.OK);
+      Logger.log(`Reset ${rowsToDelete.length} check-ins for ${day}`);
+    }
+  }
+}
+
+/**
+ * Get scanner PIN from Script Properties
+ */
+function getScannerPin() {
+  const props = PropertiesService.getScriptProperties();
+  return props.getProperty("SCANNER_PIN") || "1234"; // Default PIN
+}
+
+/**
+ * Set scanner PIN via menu
+ */
+function setScannerPin() {
+  const ui = SpreadsheetApp.getUi();
+  const currentPin = getScannerPin();
+  
+  const response = ui.prompt(
+    "Set Scanner PIN",
+    `Current PIN: ${currentPin}\n\nEnter a new 4-6 digit PIN for scanner access:`,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response.getSelectedButton() === ui.Button.OK) {
+    const newPin = response.getResponseText().trim();
+    
+    if (!/^\d{4,6}$/.test(newPin)) {
+      ui.alert("Error", "PIN must be 4-6 digits.", ui.ButtonSet.OK);
+      return;
+    }
+    
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty("SCANNER_PIN", newPin);
+    ui.alert("Success", `Scanner PIN has been set to: ${newPin}`, ui.ButtonSet.OK);
+    Logger.log(`Scanner PIN updated to: ${newPin}`);
+  }
+}
+
+/**
+ * Validate scanner PIN
+ */
+function validateScannerPin(pin) {
+  const correctPin = getScannerPin();
+  return pin === correctPin;
 }

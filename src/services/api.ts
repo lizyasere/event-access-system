@@ -189,4 +189,26 @@ export const apiService = {
 
     return response.json();
   },
+
+  /**
+   * Validate scanner PIN
+   */
+  async validateScannerPin(pin: string): Promise<{ success: boolean; message: string }> {
+    if (API_CONFIG.DEV_MODE) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      // In dev mode, accept any 4+ digit PIN
+      return {
+        success: pin.length >= 4,
+        message: pin.length >= 4 ? "PIN valid" : "Invalid PIN",
+      };
+    }
+
+    const response = await fetch(`${API_CONFIG.APPS_SCRIPT_URL}?action=validatePin&pin=${encodeURIComponent(pin)}`);
+    
+    if (!response.ok) {
+      throw new Error("PIN validation failed");
+    }
+
+    return response.json();
+  },
 };
