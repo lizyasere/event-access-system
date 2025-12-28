@@ -1,48 +1,22 @@
-import React, { useCallback, useMemo } from "react";
-import { Mail, Check, ExternalLink } from "lucide-react";
-import { API_CONFIG } from "../../config/api";
+import React from "react";
+import { Mail, Check, CheckCircle, Inbox } from "lucide-react";
 
 interface SuccessScreenProps {
   mainGuestName: string;
-  qrCodes: { name: string; qrImage: string; token: string }[];
+  mainGuestEmail?: string;
   onReset: () => void;
 }
 
 export const SuccessScreen: React.FC<SuccessScreenProps> = ({
   mainGuestName,
-  qrCodes,
+  mainGuestEmail,
   onReset,
 }) => {
-  const passBaseUrl = useMemo(() => {
-    const configured = API_CONFIG.CHECK_IN_BASE_URL;
-    if (configured && configured.length) {
-      return configured.replace(/\/$/, "");
-    }
-    if (typeof window !== "undefined") {
-      return window.location.origin.replace(/\/$/, "");
-    }
-    return "";
-  }, []);
-
-  const buildPassUrl = useCallback(
-    (token: string) => `${passBaseUrl}/pass/${token}`,
-    [passBaseUrl]
-  );
-
-  const handleOpenPass = useCallback(
-    (token: string, autoPrint = false) => {
-      const url = `${buildPassUrl(token)}${autoPrint ? "?print=1" : ""}`;
-      if (typeof window !== "undefined") {
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
-    },
-    [buildPassUrl]
-  );
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full p-10 border border-orange-100">
-        <div className="text-center mb-10">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-10 border border-orange-100">
+        {/* Success Icon */}
+        <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full mb-6 shadow-lg">
             <Check className="w-14 h-14 text-white" strokeWidth={3} />
           </div>
@@ -55,56 +29,70 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({
           </p>
         </div>
 
-        <div className="bg-gradient-to-r from-orange-50 to-orange-100 border-2 border-orange-200 rounded-2xl p-6 mb-10">
+        {/* Email Sent Notification */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-6 mb-8">
           <div className="flex items-start gap-4">
-            <div className="p-3 rounded-xl bg-orange-600">
-              <Mail className="w-6 h-6 text-white flex-shrink-0" />
+            <div className="p-3 rounded-xl bg-green-600 flex-shrink-0">
+              <Mail className="w-6 h-6 text-white" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-lg font-bold text-gray-900 mb-2">
-                VIP Passes Sent to Your Email
+                Your VIP Passes Have Been Sent!
+              </p>
+              <p className="text-gray-700">
+                We've sent your digital VIP access passes to:
+              </p>
+              <p className="text-lg font-semibold text-green-700 mt-1">
+                {mainGuestEmail || "your registered email"}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-6 mb-10">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-2xl font-bold text-gray-900">
-              Digital VIP Passes
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {qrCodes.map((qr, idx) => (
-              <div
-                key={idx}
-                className="border-2 border-orange-100 rounded-2xl p-6 bg-gradient-to-br from-white to-orange-50/30 hover:border-orange-300 hover:shadow-xl transition-all flex flex-col"
-              >
-                <p className="text-lg font-bold text-gray-900 mb-4 text-center">
-                  {qr.name}
-                </p>
-                <div className="bg-white p-4 rounded-2xl shadow-inner flex flex-col items-center">
-                  <img
-                    src={qr.qrImage}
-                    alt={`QR Code for ${qr.name}`}
-                    className="w-48 h-48"
-                  />
-                </div>
-                <div className="mt-5">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenPass(qr.token, true)}
-                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-orange-600 text-white rounded-xl font-semibold hover:bg-orange-700 transition"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    View &amp; Print Pass
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Instructions */}
+        <div className="bg-orange-50 rounded-2xl p-6 mb-8">
+          <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Inbox className="w-5 h-5 text-orange-600" />
+            What to do next:
+          </h3>
+          <ul className="space-y-3">
+            <li className="flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <span className="text-gray-700">
+                Check your email inbox for the VIP Guest Logistics Guide
+              </span>
+            </li>
+            <li className="flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <span className="text-gray-700">
+                <strong>Don't see it?</strong> Check your spam/junk folder
+              </span>
+            </li>
+            <li className="flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <span className="text-gray-700">
+                Present your QR code (printed or on phone) at the event entrance
+              </span>
+            </li>
+            <li className="flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <span className="text-gray-700">
+                Arrive by <strong>3:30 PM</strong> for gate opening
+              </span>
+            </li>
+          </ul>
         </div>
 
+        {/* Event Details Reminder */}
+        <div className="text-center mb-8 p-4 bg-gray-50 rounded-xl">
+          <p className="text-sm text-gray-500 uppercase tracking-wide mb-1">Event Date</p>
+          <p className="text-lg font-bold text-gray-900">December 28, 2025 · 4:00 PM</p>
+          <p className="text-sm text-gray-600 mt-1">
+            Rehoboth Multi-Purpose Hall, Calvary Bus Stop, Ikotun
+          </p>
+        </div>
+
+        {/* Register Another Button */}
         <button
           onClick={onReset}
           className="w-full bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 py-4 rounded-xl font-bold text-lg hover:from-gray-200 hover:to-gray-300 hover:shadow-lg transition-all"

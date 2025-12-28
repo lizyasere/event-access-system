@@ -82,8 +82,9 @@ function buildQrCodeDataUri(checkInUrl) {
 
 /**
  * Send event emails through Resend's transactional API
+ * Now supports attachments with content_id for inline images
  */
-function sendEmailViaResend(toEmail, subject, htmlBody, recipientName) {
+function sendEmailViaResend(toEmail, subject, htmlBody, recipientName, attachments) {
   const resendConfig = getResendConfig();
   
   if (!resendConfig.apiKey) {
@@ -116,6 +117,11 @@ function sendEmailViaResend(toEmail, subject, htmlBody, recipientName) {
     subject: subject,
     html: htmlBody,
   };
+  
+  // Add attachments if provided (for inline QR code images)
+  if (attachments && attachments.length > 0) {
+    payload.attachments = attachments;
+  }
 
   const response = UrlFetchApp.fetch(CONFIG.RESEND_API_URL, {
     method: "post",
@@ -788,94 +794,105 @@ function buildEmailHtml(mainGuestName, passCards) {
 }
 
 /**
- * Send QR codes via email - uses Resend if enabled, falls back to Gmail
+ * Fetch QR code as raw base64 string (without data URI prefix)
+ * This is needed for Resend attachments
+ */
+function fetchQrCodeAsRawBase64(checkInUrl) {
+  try {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(
+      checkInUrl
+    )}&format=png`;
+    const response = UrlFetchApp.fetch(qrUrl, { muteHttpExceptions: true });
+    if (response.getResponseCode() >= 400) {
+      Logger.log(`QR fetch failed: ${response.getResponseCode()}`);
+      return null;
+    }
+    const blob = response.getBlob();
+    return Utilities.base64Encode(blob.getBytes());
+  } catch (error) {
+    Logger.log(`QR raw base64 error: ${error.toString()}`);
+    return null;
+  }
+}
+
+/**
+ * Send QR codes via email - uses Resend with CID attachments, falls back to Gmail
  */
 function sendQRCodesEmail(email, mainGuestName, guests) {
   try {
     const subject = "VIP Guest Logistics Guide - Calvary Bible Church";
     const resendConfig = getResendConfig();
     
-    // For Resend: Use base64 data URIs (CID doesn't work)
-    // For Gmail: Use CID inline images
     const useResend = resendConfig.enabled && resendConfig.apiKey && resendConfig.senderEmail;
     
-    const inlineImages = {}; // Only used for Gmail fallback
+    if (useResend) {
+      // Build HTML with CID references and collect attachments
+      const attachments = [];
+      const passCardsHtml = [];
+      
+      guests.forEach((guest, index) => {
+        const cid = `qr_${index}`;
+        const rawBase64 = fetchQrCodeAsRawBase64(guest.qrData.checkInUrl);
+        
+        if (rawBase64) {
+          // Add attachment with content_id for inline display
+          attachments.push({
+            filename: `qr_${index}.png`,
+            content: rawBase64,
+            content_id: cid
+          });
+          // Reference via CID in HTML
+          passCardsHtml.push(buildPassCardHtml(guest, `cid:${cid}`));
+        } else {
+          // Fallback to external URL if QR fetch fails
+          const externalUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(guest.qrData.checkInUrl)}&format=png`;
+          passCardsHtml.push(buildPassCardHtml(guest, externalUrl));
+        }
+      });
+      
+      const htmlBody = buildEmailHtml(mainGuestName, passCardsHtml.join("\n"));
+      
+      try {
+        sendEmailViaResend(email, subject, htmlBody, mainGuestName, attachments);
+        Logger.log(`Email sent via Resend with ${attachments.length} inline QR images to ${email}`);
+        return true;
+      } catch (resendError) {
+        Logger.log(`Resend send error: ${resendError.toString()}. Falling back to Gmail.`);
+        // Fall through to Gmail
+      }
+    }
+
+    // Gmail with CID inline images
+    const inlineImages = {};
     const passCardsHtml = [];
     
     guests.forEach((guest, index) => {
+      const cid = `qr_${index}`;
+      const qrBlob = fetchQrCodeBlob(guest.qrData.checkInUrl);
       let qrImageSrc;
       
-      if (useResend) {
-        // For Resend: embed QR as base64 data URI
-        const base64Qr = fetchQrCodeAsBase64(guest.qrData.checkInUrl);
-        qrImageSrc = base64Qr || `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(guest.qrData.checkInUrl)}&format=png`;
+      if (qrBlob) {
+        inlineImages[cid] = qrBlob;
+        qrImageSrc = `cid:${cid}`;
       } else {
-        // For Gmail: use CID reference
-        const cid = `qr_${index}`;
-        const qrBlob = fetchQrCodeBlob(guest.qrData.checkInUrl);
-        if (qrBlob) {
-          inlineImages[cid] = qrBlob;
-          qrImageSrc = `cid:${cid}`;
-        } else {
-          qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(guest.qrData.checkInUrl)}&format=png`;
-        }
+        qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(guest.qrData.checkInUrl)}&format=png`;
       }
       
       passCardsHtml.push(buildPassCardHtml(guest, qrImageSrc));
     });
     
     const htmlBody = buildEmailHtml(mainGuestName, passCardsHtml.join("\n"));
-
-    if (useResend) {
-      try {
-        sendEmailViaResend(email, subject, htmlBody, mainGuestName);
-        Logger.log(`Email sent via Resend to ${email}`);
-        return true;
-      } catch (resendError) {
-        Logger.log(`Resend send error: ${resendError.toString()}. Falling back to MailApp.`);
-        // Fall through to Gmail
-      }
-    }
-
-    // Gmail fallback with CID inline images
     const senderName = resendConfig.senderName || CONFIG.EVENT_HOST || "Calvary Bible Church";
     
-    // Rebuild pass cards for Gmail if we fell back from Resend
-    if (useResend) {
-      // Need to rebuild with CID references for Gmail
-      const gmailPassCardsHtml = [];
-      guests.forEach((guest, index) => {
-        const cid = `qr_${index}`;
-        const qrBlob = fetchQrCodeBlob(guest.qrData.checkInUrl);
-        let qrImageSrc;
-        if (qrBlob) {
-          inlineImages[cid] = qrBlob;
-          qrImageSrc = `cid:${cid}`;
-        } else {
-          qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&data=${encodeURIComponent(guest.qrData.checkInUrl)}&format=png`;
-        }
-        gmailPassCardsHtml.push(buildPassCardHtml(guest, qrImageSrc));
-      });
-      const gmailHtmlBody = buildEmailHtml(mainGuestName, gmailPassCardsHtml.join("\n"));
-      
-      MailApp.sendEmail({
-        to: email,
-        subject: subject,
-        htmlBody: gmailHtmlBody,
-        inlineImages: inlineImages,
-        name: senderName,
-      });
-    } else {
-      MailApp.sendEmail({
-        to: email,
-        subject: subject,
-        htmlBody: htmlBody,
-        inlineImages: inlineImages,
-        name: senderName,
-      });
-    }
+    MailApp.sendEmail({
+      to: email,
+      subject: subject,
+      htmlBody: htmlBody,
+      inlineImages: inlineImages,
+      name: senderName,
+    });
 
-    Logger.log(`Email sent successfully to ${email}`);
+    Logger.log(`Email sent via Gmail to ${email}`);
     return true;
   } catch (error) {
     Logger.log(`Email send error: ${error.toString()}`);

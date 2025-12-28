@@ -6,18 +6,16 @@ import { toast } from "react-toastify";
 import type { RegistrationFormData, RegistrationFormInput } from "../../types";
 import { registrationSchema } from "../../types";
 import { apiService } from "../../services/api";
-import { qrService } from "../../services/qr";
 import { MainGuestForm } from "./MainGuestForm";
 import { AssociateForm } from "./AssociateForm";
 import { SuccessScreen } from "./SuccessScreen";
-import { emailService } from "../../services/email";
 
 export const RegistrationForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successData, setSuccessData] = useState<{
     mainGuestName: string;
-    qrCodes: { name: string; qrImage: string; token: string }[];
+    mainGuestEmail: string;
   } | null>(null);
 
   const {
@@ -89,13 +87,12 @@ export const RegistrationForm: React.FC = () => {
         throw new Error(response.message || "Registration failed");
       }
 
-      const qrCodes = await qrService.generateQRCodesForGuests(response.guests);
-
-      // Send email with QR codes
-      await emailService.sendQRCodes(data.mainGuest, qrCodes);
-
+      // No need to generate QR codes on frontend - backend handles email with QR codes
       const mainGuestName = `${data.mainGuest.title} ${data.mainGuest.firstName} ${data.mainGuest.surname}`;
-      setSuccessData({ mainGuestName, qrCodes });
+      setSuccessData({ 
+        mainGuestName, 
+        mainGuestEmail: data.mainGuest.email 
+      });
       setShowSuccess(true);
       toast.success("Registration successful! Please check your email.");
     } catch (error) {
@@ -116,7 +113,7 @@ export const RegistrationForm: React.FC = () => {
     return (
       <SuccessScreen
         mainGuestName={successData.mainGuestName}
-        qrCodes={successData.qrCodes}
+        mainGuestEmail={successData.mainGuestEmail}
         onReset={handleReset}
       />
     );

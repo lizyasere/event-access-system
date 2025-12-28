@@ -307,6 +307,7 @@ export const QRScanner: React.FC = () => {
                 </label>
                 <select
                   value={selectedDay}
+                  title="selectedDay"
                   onChange={(e) => setSelectedDay(e.target.value)}
                   className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                 >
